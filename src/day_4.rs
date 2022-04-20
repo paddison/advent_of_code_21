@@ -76,40 +76,49 @@ fn index_of(item: i32, container: &Vec<BoardMap>) -> i32
 
 fn determine_last_winner(numbers: Vec<i32>, mut boards: Vec<Vec<BoardMap>>) -> i32 {
 
-    let mut winner_indices = vec![];
-    let mut is_winner_found = false;
     for n in &numbers {
         if n == &16 {
             println!("");
         }
-        for (i, board) in boards.iter_mut().enumerate() {
+        for board in boards.iter_mut() {
             let index = index_of(*n, board); 
             if index >= 0 {
+
                 board[index as usize].1 = true
             }
-            if is_column_complete(board) || is_row_complete(board) {
-                winner_indices.push(i);
-                is_winner_found = true;
-            }
         }
-        if is_winner_found {
-            for i in &winner_indices {
-                if boards.len() != 1 {
-                    boards.remove(*i);
-                    is_winner_found = false;
-                } else {
-                    let sum: i32 = boards[*i].iter()
-                        .filter(|(_, marked)| !marked)
-                        .map(|(n, _)| n)
-                        .sum();
-        
-                    return sum * n;
-                }
-            }
+        if boards.len() > 1 {
+            boards.retain(|b| !(is_row_complete(b) || is_column_complete(b)));
+        } else if is_row_complete(&boards[0]) || is_column_complete(&boards[0]) {
+            let sum: i32 = boards[0].iter()
+                    .filter(|(_, marked)| !marked)
+                    .map(|(n, _)| *n)
+                    .sum();
+
+            return sum * n;
         }
     }
     -1
 }
+
+
+fn print_board(board: &Vec<BoardMap>) {
+    let mut board_string = String::new();
+    for (i, (n, marked)) in board.iter().enumerate() {
+        if i != 0 && i % 5 == 0 {
+            board_string += "\n";
+        }
+        
+        if *marked {
+            board_string += &format!("{}. ", n);
+        } else {
+            board_string += &format!("{} ", n);
+        }
+
+    }
+    println!("{}", board_string);
+}
+
 
 pub fn solve_4_1(file_name: &str) -> i32 {
     let input = parse_lines(file_name);
@@ -141,7 +150,7 @@ mod tests {
     #[test]
     fn test_determine_last_winner() {
         let input = parse_lines("data/day_4_test.txt");
-        let (numbers, mut boards) = parse_board(input);
+        let (numbers, boards) = parse_board(input);
         let result = determine_last_winner(numbers, boards);
         assert_eq!(1924, result);
     }
