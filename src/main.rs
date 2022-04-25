@@ -1,6 +1,6 @@
-use advent_of_code::day_4::*;
+use advent_of_code::day_5::*;
 
 fn main() {
-    let result = solve_4_2("data/day_4.txt");
+    let result = solve_5_1("data/day_5.txt");
     println!("result is: {}", result);
 }
