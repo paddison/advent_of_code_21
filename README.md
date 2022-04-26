@@ -1,2 +1,2 @@
-# advent_of_code_21
+# Advent of Code 21
 2021 Advent of Code Puzzles found at [Advent of Code](https://adventofcode.com/)
