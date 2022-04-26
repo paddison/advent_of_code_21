@@ -7,12 +7,6 @@ struct Line {
     end: (u32, u32),
 }
 
-struct LineIter {
-    line: Line,
-    is_horizontal: bool,
-    pos: u32,
-}
-
 impl Line {
     fn new(start: (u32, u32), end: (u32, u32)) -> Self {
         Line { start, end }
@@ -26,7 +20,7 @@ impl Line {
         self.start.0 == self.end.0
     }
 
-    fn print_map(map: &HashMap<(u32, u32), u32>, dim: u32) {
+    fn _print_map(map: &HashMap<(u32, u32), u32>, dim: u32) {
         for i in 0..dim {
             let mut row = String::new();
             for j in 0..dim {
@@ -53,59 +47,106 @@ impl From<String> for Line {
     }
 }
 
+impl From<&str> for Line {
+    fn from(line: &str) -> Self {
+        let touples: Vec<(u32, u32)> = line.split("->")
+        .map(|touple| {
+        let n: Vec<u32> = touple.split(",").map(|n| n.trim().parse::<u32>().unwrap()).collect();
+        (n[0], n[1])
+        })
+        .collect();
+    Line::new(touples[0], touples[1])
+    }
+}
+
 impl IntoIterator for Line {
     type Item = (u32, u32);
 
-    type IntoIter = LineIter;
+    type IntoIter = Box<dyn Iterator<Item = (u32, u32)>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let is_horizontal = self.is_horizontal();
-        LineIter { line: self, is_horizontal, pos: 0 }
+        if self.is_horizontal() || self.is_vertical() {
+            let is_horizontal = self.is_horizontal();
+            Box::new(LineIter { line: self, is_horizontal, depleted: false })
+        } else {
+            Box::new(LineIterDiag { line: self, depleted: false})
+        }
     }
+}
+
+struct LineIter {
+    line: Line,
+    is_horizontal: bool,
+    depleted: bool,
 }
 
 impl Iterator for LineIter {
     type Item = (u32, u32);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = match self.is_horizontal {
-            true => {
-                if self.line.start.0 > self.line.end.0 {
-                    // descending line
-                    if self.line.start.0 - self.pos + 1 <= self.line.end.0 {
-                        None
+        if !self.depleted {
+            if self.line.start == self.line.end {
+                self.depleted = true;
+                Some((self.line.start.0, self.line.start.1))
+            } else {
+                let next = Some((self.line.start.0, self.line.start.1));
+                if self.is_horizontal {
+                    if self.line.start.0 > self.line.end.0 {
+                        // left
+                        self.line.start.0 -= 1;
                     } else {
-                        Some((self.line.start.0 - self.pos, self.line.start.1))
+                        // right
+                        self.line.start.0 += 1;
                     }
                 } else {
-                    // ascending line
-                    if self.line.start.0 + self.pos >= self.line.end.0 + 1 {
-                        None
+                    if self.line.start.1 > self.line.end.1 {
+                        // down
+                        self.line.start.1 -= 1;
                     } else {
-                        Some((self.line.start.0 + self.pos, self.line.start.1))
+                        // up
+                        self.line.start.1 += 1;
                     }
                 }
-            },
-            false => {
-                if self.line.start.1 > self.line.end.1 {
-                    // descending line
-                    if self.line.start.1 - self.pos + 1 <= self.line.end.1 {
-                        None
-                    } else {
-                        Some((self.line.start.0, self.line.start.1 - self.pos))
-                    }
+                next
+            }
+        } else {
+            None
+        }
+        
+    }
+}
+
+struct LineIterDiag {
+    line: Line,
+    depleted: bool,
+}
+
+impl Iterator for LineIterDiag {
+    type Item = (u32, u32);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.depleted {
+            if self.line.start == self.line.end {
+                self.depleted = true;
+                Some((self.line.start.0, self.line.start.1))
+            } else {
+                let next = Some((self.line.start.0, self.line.start.1));
+                if self.line.start.0 < self.line.end.0 {
+                    self.line.start.0 += 1;
                 } else {
-                    // ascending line
-                    if self.line.start.1 + self.pos >= self.line.end.1 + 1 {
-                        None
-                    } else {
-                        Some((self.line.start.0, self.line.start.1 + self.pos))
-                    }
+                    self.line.start.0 -= 1;
                 }
-            },
-        };
-        self.pos += 1;
-        next
+    
+                if self.line.start.1 < self.line.end.1 {
+                    self.line.start.1 += 1;
+                } else {
+                    self.line.start.1 -= 1;
+                }
+                next
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -126,7 +167,21 @@ pub fn solve_5_1(file_name: &str) -> u32 {
     let raw_lines = parse_lines(file_name);
     let lines: Vec<Line> = raw_lines.into_iter()
         .map(|line| Line::from(line))
-        .filter(|line| !(line.start == (0, 0) && line.end == (0, 0)))
+        .filter(|line| line.is_horizontal() || line.is_vertical())
+        .collect();
+
+    let map = create_map(lines);
+    let mut count = 0;
+    for (_, val) in map {
+        if val >= 2 { count += 1 };
+    }
+    count
+}
+
+pub fn solve_5_2(file_name: &str) -> u32 {
+    let raw_lines = parse_lines(file_name);
+    let lines: Vec<Line> = raw_lines.into_iter()
+        .map(|line| Line::from(line))
         .collect();
 
     let map = create_map(lines);
@@ -196,6 +251,49 @@ fn test_iterator_vertical_desc() {
     assert_eq!(line.next(), None);
 }
 
+#[test]
+fn test_iterator_diag_right_down() {
+    let line = Line::from("0,1 -> 3,4");
+    let mut iter = line.into_iter();
+    assert_eq!(Some((0, 1)), iter.next());
+    assert_eq!(Some((1, 2)), iter.next());
+    assert_eq!(Some((2, 3)), iter.next());
+    assert_eq!(Some((3, 4)), iter.next());
+    assert_eq!(None, iter.next());
+}
+
+#[test]
+fn test_iterator_diag_right_up() {
+    let line = Line::from("0,4 -> 3,1");
+    let mut iter = line.into_iter();
+    assert_eq!(Some((0, 4)), iter.next());
+    assert_eq!(Some((1, 3)), iter.next());
+    assert_eq!(Some((2, 2)), iter.next());
+    assert_eq!(Some((3, 1)), iter.next());
+    assert_eq!(None, iter.next());
+}
+
+#[test]
+fn test_iterator_diag_left_down() {
+    let line = Line::from("3,1 -> 0,4");
+    let mut iter = line.into_iter();
+    assert_eq!(Some((3, 1)), iter.next());
+    assert_eq!(Some((2, 2)), iter.next());
+    assert_eq!(Some((1, 3)), iter.next());
+    assert_eq!(Some((0, 4)), iter.next());
+    assert_eq!(None, iter.next());
+}
+
+#[test]
+fn test_iterator_diag_left_up() {
+    let line = Line::from("3,4 -> 0,1");
+    let mut iter = line.into_iter();
+    assert_eq!(Some((3, 4)), iter.next());
+    assert_eq!(Some((2, 3)), iter.next());
+    assert_eq!(Some((1, 2)), iter.next());
+    assert_eq!(Some((0, 1)), iter.next());
+    assert_eq!(None, iter.next());
+}
 
 
 #[test]
@@ -203,14 +301,30 @@ fn test_create_map() {
     let raw_lines = parse_lines("data/day_5_test.txt");
     let lines: Vec<Line> = raw_lines.into_iter()
         .map(|line| Line::from(line))
-        .filter(|line| line.is_horizontal() && line.is_vertical())
+        .filter(|line| line.is_horizontal() || line.is_vertical())
         .collect();
     
     let map = create_map(lines);
     let mut count = 0;
-    Line::print_map(&map, 10);
+    Line::_print_map(&map, 10);
     for (_, val) in map {
         if val >= 2 { count += 1 };
     }
     assert_eq!(count, 5);
+}
+
+#[test]
+fn test_create_map_all() {
+    let raw_lines = parse_lines("data/day_5_test.txt");
+    let lines: Vec<Line> = raw_lines.into_iter()
+        .map(|line| Line::from(line))
+        .collect();
+    
+    let map = create_map(lines);
+    let mut count = 0;
+    Line::_print_map(&map, 10);
+    for (_, val) in map {
+        if val >= 2 { count += 1 };
+    }
+    assert_eq!(count, 12);
 }
