@@ -1,6 +1,7 @@
-use advent_of_code::day_6::*;
+use advent_of_code::day_8;
+
 
 fn main() {
-    let result = solve_6_1("data/day_6.txt", 951);
+    let result = day_8::get_solution_2();
     println!("result is: {}", result);
 }
