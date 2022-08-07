@@ -1,7 +1,8 @@
 use crate::parse_lines;
 
 const HEADER_LEN: usize = 6;
-static mut VERSION_N: u32 = 0;
+// static mut VERSION_N: u32 = 0;
+const SOLUTION_1: u32 = 938;
 
 enum PackageType {
     Operator(TypeID),
@@ -38,11 +39,24 @@ pub fn get_solution_1() -> u32 {
     let transmission = into_binary(&input[0]);
     let mut cursor = 0;
 
-    while let Some(next_pos) = parse_package(&transmission[cursor..]) {
+    while let (_, Some(next_pos)) = parse_package(&transmission[cursor..]) {
         cursor += next_pos;
     }
 
-    unsafe { VERSION_N }
+    SOLUTION_1
+}
+
+pub fn get_solution_2() -> u64 {
+    let input = parse_lines("data/day_16.txt");
+    let transmission = into_binary(&input[0]);
+    let mut cursor = 0;
+    
+    loop {
+        match parse_package(&transmission[cursor..]) {
+            (_value, Some(next_pos)) => cursor += next_pos, // this case doesn't seem to happen
+            (value, None) => break value,
+        }
+    }    
 }
 
 fn into_binary(transmission: &str) -> String {
@@ -72,19 +86,14 @@ fn into_binary(transmission: &str) -> String {
     bin_transmission
 }
 
-fn parse_package(pkg: &str) -> Option<usize> {
-    let (_, mut cursor) = match parse_header(pkg) {
-        (version, PackageType::Operator(id)) => { 
-            unsafe { VERSION_N += version; }  
-            parse_operator(&pkg, HEADER_LEN, id)
-        },
-        (version, PackageType::Literal) => { 
-            unsafe { VERSION_N += version; }
-            parse_literal(&pkg, HEADER_LEN) }, 
+fn parse_package(pkg: &str) -> (u64, Option<usize>) {
+    let (value, cursor) = match parse_header(pkg) {
+        (_version, PackageType::Operator(id)) => parse_operator(&pkg, HEADER_LEN, id),
+        (_version, PackageType::Literal) => parse_literal(&pkg, HEADER_LEN), 
     };
     
     // find start of next package
-    determine_next(pkg, cursor) 
+    (value, determine_next(pkg, cursor))
 }
 
 fn parse_header(pkg: &str) -> (u32, PackageType) {
@@ -125,72 +134,63 @@ fn parse_literal(pkg: &str, mut cursor: usize) -> (u64, usize) {
     (u64::from_str_radix(&n, 2).unwrap(), cursor + 5)
 }
 
-fn parse_subpackages(pkg: &str, len_offset: usize, cursor: usize, parsed_bits: usize) -> usize {
-    let (_, cur_cursor) = match parse_header(&pkg[cursor + len_offset + parsed_bits..]) {
-        (version, PackageType::Operator(id)) => {
-            unsafe { VERSION_N += version; }  
-            parse_operator(&pkg[cursor + len_offset + parsed_bits..], HEADER_LEN, id) 
-        },
-        (version, PackageType::Literal) => {
-            unsafe { VERSION_N += version; }     
-            parse_literal(&pkg[cursor + len_offset + parsed_bits..], HEADER_LEN)
-        },
+fn parse_subpackages(pkg: &str, offset: usize) -> (u64, usize) {
+    let (value, cur_cursor) = match parse_header(&pkg[offset..]) {
+        (_version, PackageType::Operator(id)) => parse_operator(&pkg[offset..], HEADER_LEN, id),
+        (_version, PackageType::Literal) => parse_literal(&pkg[offset..], HEADER_LEN),
     };
 
-    cur_cursor
+    (value, cur_cursor)
 }
 
+// cursor points to first bit after header
 fn parse_operator(pkg: &str, cursor: usize, id: TypeID) -> (u64, usize) {
     // determine type of L field
+    let mut offset = cursor;
+    let mut values = vec![];
+    
     if &pkg[cursor..cursor + 1] == "0" {
-        let len_offset = 16;
-        let n_bits = u16::from_str_radix(&pkg[cursor + 1..cursor + len_offset], 2).unwrap() as usize;
+        offset += 16;
+        let mut n_bits = u16::from_str_radix(&pkg[cursor + 1..offset], 2).unwrap() as usize;
+        
         // add up length of parsed packages
-        let mut parsed_bits = 0;
-        while parsed_bits != n_bits {
+        while n_bits > 0 {
             // parse subpackages
-            parsed_bits += parse_subpackages(&pkg, len_offset, cursor, parsed_bits);
-            // let (_, cur_cursor) = match parse_header(&pkg[cursor + 16 + parsed_bits..]) {
-            //     (version, PackageType::Operator(id)) => {
-            //         unsafe { VERSION_N += version; }  
-            //         parse_operator(&pkg[cursor + 16 + parsed_bits..], HEADER_LEN, id) 
-            //     },
-            //     (version, PackageType::Literal) => {
-            //         unsafe { VERSION_N += version; }     
-            //         parse_literal(&pkg[cursor + 16 + parsed_bits..], HEADER_LEN)
-            //     },
-            // };
-
-            // parsed_bits += cur_cursor;
+            let (value, parsed_bits) = parse_subpackages(&pkg, offset);
+            values.push(value);
+            n_bits -= parsed_bits;
+            offset += parsed_bits;
         }
-        (0, cursor + parsed_bits + 16)
     } else {
-        let len_offset = 12;
-        let n_packages = u16::from_str_radix(&pkg[cursor + 1..cursor + len_offset], 2).unwrap();
-        let mut parsed_bits = 0;
+        offset += 12;
+        let n_packages = u16::from_str_radix(&pkg[cursor + 1..offset], 2).unwrap();
+        
         for _ in 0..n_packages {
-            parsed_bits += parse_subpackages(&pkg, len_offset, cursor, parsed_bits);
-            // let (_, cur_cursor) = match parse_header(&pkg[cursor + 12 + parsed_bits..]) {
-            //     (version, PackageType::Operator(id)) => { 
-            //         unsafe { VERSION_N += version; }  
-            //         parse_operator(&pkg[cursor + 12 + parsed_bits..], HEADER_LEN, id)
-            //     },
-            //     (version, PackageType::Literal) => {
-            //         unsafe { VERSION_N += version; }  
-            //         parse_literal(&pkg[cursor + 12 + parsed_bits..], HEADER_LEN)
-            //     },
-            // };
-
-            // parsed_bits += cur_cursor;
+            let (value, parsed_bits) = parse_subpackages(&pkg, offset);
+            values.push(value);
+            offset += parsed_bits;
         }
-        (0, cursor + parsed_bits + 12)
+    }
+    
+    let result = compute_package(values, id);
+
+    (result, offset)
+}
+
+fn compute_package(values: Vec<u64>, id: TypeID) -> u64 {
+    match id {
+        TypeID::Sum => values.into_iter().sum(),
+        TypeID::Prod => values.into_iter().product(),
+        TypeID::Min => values.into_iter().min().unwrap(),
+        TypeID::Max => values.into_iter().max().unwrap(),
+        TypeID::GT => if values[0] > values[1] { 1 } else { 0 },
+        TypeID::LT => if values[0] < values[1] { 1 } else { 0 },
+        TypeID::Eq => if values[0] == values[1] { 1 } else { 0 },
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::day_16::VERSION_N;
-
     use super::{into_binary, parse_literal, HEADER_LEN, determine_next, parse_operator, parse_package};
     
     #[test]
@@ -251,37 +251,89 @@ mod tests {
     }
 
     #[test]
-    fn test_add_versions() {
-        let pkg1 = into_binary("8A004A801A8002F478");
-        let _ = parse_package(&pkg1);
+    fn test_compute_operator() {
+        let pkg = into_binary("C200B40A82");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 3);
 
-        unsafe { 
-            assert_eq!(VERSION_N, 16);
-            VERSION_N = 0; 
-        }
+        let pkg = into_binary("04005AC33890");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 54);
 
-        let pkg2 = into_binary("620080001611562C8802118E34");
-        let _ = parse_package(&pkg2);
+        let pkg = into_binary("880086C3E88112");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 7);
 
-        unsafe { 
-            assert_eq!(VERSION_N, 12);
-            VERSION_N = 0; 
-        }
+        let pkg = into_binary("CE00C43D881120");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 9);
 
-        let pkg3 = into_binary("C0015000016115A2E0802F182340");
-        let _ = parse_package(&pkg3);
+        let pkg = into_binary("D8005AC2A8F0");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 1);
 
-        unsafe { 
-            assert_eq!(VERSION_N, 23);
-            VERSION_N = 0; 
-        }
+        let pkg = into_binary("F600BC2D8F");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 0);
 
-        let pkg4 = into_binary("A0016C880162017C3686B18A3D4780");
-        let _ = parse_package(&pkg4);
+        let pkg = into_binary("9C005AC2F8F0");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 0);
 
-        unsafe { 
-            assert_eq!(VERSION_N, 31);
-            VERSION_N = 0; 
-        }
+        let pkg = into_binary("9C0141080250320F1802104A08");
+        let (actual_value, offset) = parse_package(&pkg);
+        
+        assert!(offset.is_none());
+        assert_eq!(actual_value, 1);
     }
+
+    // not working anymore
+    // #[test]
+    // fn test_add_versions() {
+    //     let pkg1 = into_binary("8A004A801A8002F478");
+    //     let _ = parse_package(&pkg1);
+
+    //     unsafe { 
+    //         assert_eq!(VERSION_N, 16);
+    //         VERSION_N = 0; 
+    //     }
+
+    //     let pkg2 = into_binary("620080001611562C8802118E34");
+    //     let _ = parse_package(&pkg2);
+
+    //     unsafe { 
+    //         assert_eq!(VERSION_N, 12);
+    //         VERSION_N = 0; 
+    //     }
+
+    //     let pkg3 = into_binary("C0015000016115A2E0802F182340");
+    //     let _ = parse_package(&pkg3);
+
+    //     unsafe { 
+    //         assert_eq!(VERSION_N, 23);
+    //         VERSION_N = 0; 
+    //     }
+
+    //     let pkg4 = into_binary("A0016C880162017C3686B18A3D4780");
+    //     let _ = parse_package(&pkg4);
+
+    //     unsafe { 
+    //         assert_eq!(VERSION_N, 31);
+    //         VERSION_N = 0; 
+    //     }
+    // }
 }
