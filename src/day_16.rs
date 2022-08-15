@@ -1,8 +1,5 @@
-use crate::parse_lines;
-
+// indicates where the body of a package starts
 const HEADER_LEN: usize = 6;
-// static mut VERSION_N: u32 = 0;
-const SOLUTION_1: u32 = 938;
 
 enum PackageType {
     Operator(TypeID),
@@ -19,9 +16,9 @@ enum TypeID {
     Eq,
 }
 
-impl Into<TypeID> for u8 {
-    fn into(self) -> TypeID {
-        match self {
+impl From<u8> for TypeID {
+    fn from(val: u8) -> Self {
+        match val {
             0 => TypeID::Sum,
             1 => TypeID::Prod,
             2 => TypeID::Min,
@@ -35,28 +32,19 @@ impl Into<TypeID> for u8 {
 }
 
 pub fn get_solution_1() -> u32 {
-    let input = parse_lines("data/day_16.txt");
-    let transmission = into_binary(&input[0]);
-    let mut cursor = 0;
+    let input = include_str!("../data/day_16.txt");
+    let transmission = into_binary(&input);
+    let mut version_sum = 0;
+    parse_package(&transmission, 0, &mut version_sum);
 
-    while let (_, Some(next_pos)) = parse_package(&transmission[cursor..]) {
-        cursor += next_pos;
-    }
-
-    SOLUTION_1
+    version_sum
 }
 
 pub fn get_solution_2() -> u64 {
-    let input = parse_lines("data/day_16.txt");
-    let transmission = into_binary(&input[0]);
-    let mut cursor = 0;
-    
-    loop {
-        match parse_package(&transmission[cursor..]) {
-            (_value, Some(next_pos)) => cursor += next_pos, // this case doesn't seem to happen
-            (value, None) => break value,
-        }
-    }    
+    let input = include_str!("../data/day_16.txt");
+    let transmission = into_binary(&input);
+
+    parse_package(&transmission, 0, &mut 0).0
 }
 
 fn into_binary(transmission: &str) -> String {
@@ -86,14 +74,14 @@ fn into_binary(transmission: &str) -> String {
     bin_transmission
 }
 
-fn parse_package(pkg: &str) -> (u64, Option<usize>) {
-    let (value, cursor) = match parse_header(pkg) {
-        (_version, PackageType::Operator(id)) => parse_operator(&pkg, HEADER_LEN, id),
-        (_version, PackageType::Literal) => parse_literal(&pkg, HEADER_LEN), 
-    };
-    
-    // find start of next package
-    (value, determine_next(pkg, cursor))
+fn parse_package(pkg: &str, offset: usize, version_sum: &mut u32) -> (u64, usize) {
+    let (version, p_type) = parse_header(&pkg[offset..]);
+    *version_sum += version;
+
+    match p_type {
+        PackageType::Operator(id) => parse_operator(&pkg[offset..], id, version_sum),
+        PackageType::Literal => parse_literal(&pkg[offset..]), 
+    }
 }
 
 fn parse_header(pkg: &str) -> (u32, PackageType) {
@@ -101,26 +89,12 @@ fn parse_header(pkg: &str) -> (u32, PackageType) {
     match u8::from_str_radix(&pkg[3..6], 2) {
         Ok(4) => (version, PackageType::Literal),
         Ok(id) => (version, PackageType::Operator(id.into())),
-        Err(_) => panic!(),
+        Err(_) => panic!("Got invalid header."),
     }
 }
 
-fn determine_next(pkg: &str, mut cursor: usize) -> Option<usize> {
-    // find start of next package
-    let offset = 4 - (cursor % 4);
-    cursor += offset; // adjust cursor to point to 4 bit boundary
-    while let Some(val) = pkg.get(cursor..cursor + 3) {
-        if val.contains("1") {
-            return Some(cursor)
-        }
-        cursor += 4;
-    }
-
-    None
-}
-
-fn parse_literal(pkg: &str, mut cursor: usize) -> (u64, usize) {
-
+fn parse_literal(pkg: &str) -> (u64, usize) {
+    let mut cursor = HEADER_LEN;
     let mut n = String::new();
 
     loop {
@@ -134,50 +108,29 @@ fn parse_literal(pkg: &str, mut cursor: usize) -> (u64, usize) {
     (u64::from_str_radix(&n, 2).unwrap(), cursor + 5)
 }
 
-fn parse_subpackages(pkg: &str, offset: usize) -> (u64, usize) {
-    let (value, cur_cursor) = match parse_header(&pkg[offset..]) {
-        (_version, PackageType::Operator(id)) => parse_operator(&pkg[offset..], HEADER_LEN, id),
-        (_version, PackageType::Literal) => parse_literal(&pkg[offset..], HEADER_LEN),
-    };
-
-    (value, cur_cursor)
-}
-
 // cursor points to first bit after header
-fn parse_operator(pkg: &str, cursor: usize, id: TypeID) -> (u64, usize) {
-    // determine type of L field
-    let mut offset = cursor;
+fn parse_operator(pkg: &str, id: TypeID, version_sum: &mut u32) -> (u64, usize) {
     let mut values = vec![];
+
+    // switch up length types, so we can calculate the subpackages left later
+    let (mut offset, len_type) = if &pkg[HEADER_LEN..HEADER_LEN + 1] == "0" { (16, 1) } else { (12, 0) };
     
-    if &pkg[cursor..cursor + 1] == "0" {
-        offset += 16;
-        let mut n_bits = u16::from_str_radix(&pkg[cursor + 1..offset], 2).unwrap() as usize;
-        
-        // add up length of parsed packages
-        while n_bits > 0 {
-            // parse subpackages
-            let (value, parsed_bits) = parse_subpackages(&pkg, offset);
-            values.push(value);
-            n_bits -= parsed_bits;
-            offset += parsed_bits;
-        }
-    } else {
-        offset += 12;
-        let n_packages = u16::from_str_radix(&pkg[cursor + 1..offset], 2).unwrap();
-        
-        for _ in 0..n_packages {
-            let (value, parsed_bits) = parse_subpackages(&pkg, offset);
-            values.push(value);
-            offset += parsed_bits;
-        }
+    offset += HEADER_LEN;
+    
+    let mut subpackages = u16::from_str_radix(&pkg[HEADER_LEN + 1..offset], 2).unwrap() as usize;
+
+    while subpackages > 0 {
+        let (value, parsed_bits) = parse_package(pkg, offset, version_sum);
+
+        values.push(value);
+        subpackages -= parsed_bits.pow(len_type); //basically this means: if len_type == 1 { parsed_bits } else { 1 };
+        offset += parsed_bits;
     }
     
-    let result = compute_package(values, id);
-
-    (result, offset)
+    (compute_operator(values, id), offset)
 }
 
-fn compute_package(values: Vec<u64>, id: TypeID) -> u64 {
+fn compute_operator(values: Vec<u64>, id: TypeID) -> u64 {
     match id {
         TypeID::Sum => values.into_iter().sum(),
         TypeID::Prod => values.into_iter().product(),
@@ -191,7 +144,7 @@ fn compute_package(values: Vec<u64>, id: TypeID) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{into_binary, parse_literal, HEADER_LEN, determine_next, parse_operator, parse_package};
+    use super::{into_binary, parse_literal, parse_operator, parse_package};
     
     #[test]
     fn test_into_binary() {
@@ -210,42 +163,21 @@ mod tests {
 
     #[test]
     fn test_parse_literal() {
-        let (actual_val, actual_cur) = parse_literal("110100101111111000101000", HEADER_LEN);
+        let (actual_val, actual_cur) = parse_literal("110100101111111000101000");
 
         assert_eq!(actual_val, 2021);
         assert_eq!(actual_cur, 21);
     }
 
     #[test]
-    fn test_determine_next() {
-        let pkg1 = "110100101111111000101000001";
-        let (_, cursor1) = parse_literal(pkg1, HEADER_LEN);
-        let actual_next = determine_next(pkg1, cursor1);
-        
-        assert_eq!(actual_next, Some(24));
-
-        let pkg2 = "1101001011111110001010000000100";
-        let (_, cursor2) = parse_literal(pkg2, HEADER_LEN);
-        let actual_next = determine_next(pkg2, cursor2);
-        
-        assert_eq!(actual_next, Some(28));
-        
-        let pkg3 = "11010010111111100010100000000000010";
-        let (_, cursor3) = parse_literal(pkg3, HEADER_LEN);
-        let actual_next = determine_next(pkg3, cursor3);
-
-        assert_eq!(actual_next, Some(32));
-    }
-
-    #[test]
     fn test_parse_operator() {
         let pkg1 = "00111000000000000110111101000101001010010001001000000000";
-        let (_, actual_cursor1) = parse_operator(pkg1, HEADER_LEN, 6.into());
+        let (_, actual_cursor1) = parse_operator(pkg1, 6.into(), &mut 0);
 
         assert_eq!(actual_cursor1, 49);
 
         let pkg2 = "11101110000000001101010000001100100000100011000001100000";
-        let (_, actual_cursor2) = parse_operator(pkg2, HEADER_LEN, 3.into());
+        let (_, actual_cursor2) = parse_operator(pkg2, 3.into(), &mut 0);
 
         assert_eq!(actual_cursor2, 51);
     }
@@ -253,87 +185,43 @@ mod tests {
     #[test]
     fn test_compute_operator() {
         let pkg = into_binary("C200B40A82");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
+        assert_eq!(actual_value.0, 3);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 3);
 
         let pkg = into_binary("04005AC33890");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 54);
+        assert_eq!(actual_value.0, 54);
 
         let pkg = into_binary("880086C3E88112");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 7);
+        assert_eq!(actual_value.0, 7);
 
         let pkg = into_binary("CE00C43D881120");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 9);
+        assert_eq!(actual_value.0, 9);
 
         let pkg = into_binary("D8005AC2A8F0");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 1);
+        assert_eq!(actual_value.0, 1);
 
         let pkg = into_binary("F600BC2D8F");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 0);
+        assert_eq!(actual_value.0, 0);
 
         let pkg = into_binary("9C005AC2F8F0");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 0);
+        assert_eq!(actual_value.0, 0);
 
         let pkg = into_binary("9C0141080250320F1802104A08");
-        let (actual_value, offset) = parse_package(&pkg);
+        let actual_value = parse_package(&pkg, 0, &mut 0);
         
-        assert!(offset.is_none());
-        assert_eq!(actual_value, 1);
+        assert_eq!(actual_value.0, 1);
     }
-
-    // not working anymore
-    // #[test]
-    // fn test_add_versions() {
-    //     let pkg1 = into_binary("8A004A801A8002F478");
-    //     let _ = parse_package(&pkg1);
-
-    //     unsafe { 
-    //         assert_eq!(VERSION_N, 16);
-    //         VERSION_N = 0; 
-    //     }
-
-    //     let pkg2 = into_binary("620080001611562C8802118E34");
-    //     let _ = parse_package(&pkg2);
-
-    //     unsafe { 
-    //         assert_eq!(VERSION_N, 12);
-    //         VERSION_N = 0; 
-    //     }
-
-    //     let pkg3 = into_binary("C0015000016115A2E0802F182340");
-    //     let _ = parse_package(&pkg3);
-
-    //     unsafe { 
-    //         assert_eq!(VERSION_N, 23);
-    //         VERSION_N = 0; 
-    //     }
-
-    //     let pkg4 = into_binary("A0016C880162017C3686B18A3D4780");
-    //     let _ = parse_package(&pkg4);
-
-    //     unsafe { 
-    //         assert_eq!(VERSION_N, 31);
-    //         VERSION_N = 0; 
-    //     }
-    // }
 }

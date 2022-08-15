@@ -47,19 +47,19 @@ fn prepare_input(lines: Vec<String>) -> (Vec<(usize, usize)>, Vec<Fold>) {
     let mut points = vec![];
     let mut folds = vec![];
     for line in lines {
-        if line.contains(",") {
-            let result: Vec<usize> = line.split(",").map(|s| s.parse::<usize>().unwrap()).collect();
+        if line.contains(',') {
+            let result: Vec<usize> = line.split(',').map(|s| s.parse::<usize>().unwrap()).collect();
             assert_eq!(result.len(), 2);
             points.push((result[0], result[1]));
-        } else if line.contains("=") {
-            let result = line.split("=").collect::<Vec<&str>>();
+        } else if line.contains('=') {
+            let result = line.split('=').collect::<Vec<&str>>();
             assert_eq!(result.len(), 2);
             let fold = match &result[0][result[0].len() - 1..] {
                 "x" => Fold::Left(result[1].parse::<usize>().unwrap()),
                 "y" => Fold::Up(result[1].parse::<usize>().unwrap()),
                 _ => panic!("Invalid direction")
             };
-            let line = result[1].parse::<usize>().unwrap();
+            // let line = result[1].parse::<usize>().unwrap();
             folds.push(fold);
         }
     }
@@ -83,8 +83,8 @@ impl Paper {
         // determine size of paper
         let mut x_dim = 0;
         let mut y_dim = 0;
-        for i in 0..2 {
-            match folds[i] {
+        for fold in folds.iter().take(2) {
+            match fold {
                 Fold::Up(l) => y_dim = l * 2 + 1,
                 Fold::Left(l) => x_dim = l * 2 + 1,
             }
@@ -226,10 +226,6 @@ mod tests {
         // verify points are correct
         let s = format!("{}", paper);
         assert_eq!(expected_layout, s);
-        let iter = paper.into_iter();
-        // for f in iter {
-        //     println!("{:?}", f);
-        // }
     }
 
     #[test]

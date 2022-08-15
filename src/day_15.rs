@@ -25,7 +25,7 @@ pub fn get_solution_1(is_test: bool) -> u32 {
         }
     };
 
-    return result.cost
+    result.cost
 }
 
 pub fn get_solution_2(is_test: bool) -> u32 {
@@ -43,7 +43,7 @@ pub fn get_solution_2(is_test: bool) -> u32 {
         }
     };
 
-    return result.cost
+    result.cost
 }
 
 
@@ -64,7 +64,7 @@ impl CaveMap {
         }
     }
 
-    fn get_mut(&mut self, (x, y): (usize, usize)) -> Option<&mut u32> {
+    fn _get_mut(&mut self, (x, y): (usize, usize)) -> Option<&mut u32> {
         if let Some(Some(val)) =  self.vals.get_mut(x * self.dim.0 + y) {
             Some(val)
         } else {
@@ -93,7 +93,7 @@ impl CaveMap {
             }
         }
 
-        let vals = new_vals.into_iter().map(|val| Some(val)).collect();
+        let vals = new_vals.into_iter().map(Some).collect();
 
         CaveMap { vals, dim: (self.dim.0 * SCALE_FACTOR, self.dim.1 * SCALE_FACTOR) }
     }
@@ -182,7 +182,7 @@ impl CavePathFrontier {
         for path in &self.paths {
             let mut neighbors: Vec<CavePath> = vec![];
             
-            for neighbor in self.get_neighbors(&path) {
+            for neighbor in self.get_neighbors(path) {
                 neighbors.push(path.copy_update(neighbor));
             }
 

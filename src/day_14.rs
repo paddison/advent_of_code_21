@@ -132,7 +132,7 @@ fn create_count_map(poly: &str) -> HashMap::<String, u128> {
 
 fn get_most_common(count_map: &HashMap::<String, u128>) -> u128 {
     let mut max = 0;
-    for (_, v) in count_map {
+    for v in count_map.values() {
         if *v > max {
             max = *v;
         }
@@ -143,7 +143,7 @@ fn get_most_common(count_map: &HashMap::<String, u128>) -> u128 {
 
 fn get_least_common(count_map: &HashMap::<String, u128>) -> u128 {
     let mut min = u128::MAX;
-    for (_, v) in count_map {
+    for v in count_map.values() {
         if *v < min {
             min = *v;
         }
