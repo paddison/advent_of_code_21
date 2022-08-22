@@ -72,7 +72,7 @@ pub fn solve_3_2(file_name: &str) -> u32 {
 mod tests {
     use crate::day_3::binary_diagnostic;
 
-    use super::{solve_3_2, determine_oxygen_rating, determine_o2_rating};
+    use super::{determine_oxygen_rating, determine_o2_rating};
 
     #[test]
     fn test_198() {

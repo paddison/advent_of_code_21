@@ -98,9 +98,9 @@ fn get_stack_score(stack: Vec<char>) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse_lines, day_10::get_stack_score};
+    use crate::day_10::get_stack_score;
 
-    use super::{get_solution_1, discard_corrupted, get_solution_2};
+    use super::{get_solution_1, get_solution_2};
     #[test]
     fn test_get_solution_1() {
         let solution = get_solution_1(true);

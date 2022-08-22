@@ -1,81 +1,51 @@
 use std::{collections::{HashSet, HashMap}, ops::Range};
 
 pub fn get_solution_1() -> i32 {
-    
-    let x_range = (211..232).collect::<HashSet<_>>();
-    let y_range = (-124..-69).collect::<HashSet<_>>();
-    let min_y = y_range.iter().min().unwrap();
-    let max_y_vel = (min_y + 1) * -1;
+    let y_range = -124..-69;
+    let min_y = y_range.start + 1;
     min_y * (min_y + 1) / 2
 }
 
-pub fn get_solution_2() -> usize{
-    let min_x = 211;
-    let max_x = 232;
-    let min_y = -124;
-    let max_y = -69;
+pub fn get_solution_2() -> usize {
+    let target_x = 211..232;
+    let target_y = -124..-69; 
     let solve_vel_x_less_n = |delim: f64| (-0.5 + f64::sqrt(0.25 + 4. * delim * 0.5));
-    let x_range_any = (solve_vel_x_less_n(min_x.into()).ceil(), solve_vel_x_less_n((max_x + 1).into()).ceil());
-    let max_y_vel = (min_y + 1) * -1;
-    // since 124 - 69 = 55 < 69, there is a range of y_vel values between 123 and -123 where we overshoot after the last time before the target area.
+    let x_range_any = solve_vel_x_less_n(target_x.start.into()).ceil() as i32..solve_vel_x_less_n((target_x.end + 1).into()).ceil() as i32;
 
-    // calculate all y_vels where it is possible to hit the target area:
-    let mut vel_y_map = HashMap::new();
     let mut range_map = HashMap::new();
-    for vel in get_y_vels(min_y, max_y) {
+    let mut count = 0;
+    for vel in get_y_vels(target_y.start, target_y.end) {
         let mut x_set = HashSet::new();
-        for n in n_steps_to_target(vel.into(), max_y.into(), min_y.into()) {
-            let x_vals = range_map.entry(n).or_insert(determine_n_x_vels(n.into(), min_x.into(), max_x.into(), x_range_any).collect::<HashSet<_>>());
+        for n in n_steps_to_target(vel.into(), target_y.end.into(), target_y.start.into()) {
+            let x_vals = range_map
+                            .entry(n)
+                            .or_insert(
+                                determine_n_x_vels(n.into(), target_x.start.into(), target_x.end.into(), &x_range_any)
+                                    .collect::<HashSet<_>>()
+                            );
             x_set = x_set.union(&x_vals).map(|x| *x).collect();
         }
-        vel_y_map.insert(vel, x_set);
-    }
-    let mut count = 0;
-    for (vel_y, vel_xs) in vel_y_map {
-        count += vel_xs.len();
-        for vel_x in vel_xs {
-            match simulate((vel_x, vel_y), min_x..max_x + 1, min_y..max_y + 1) {
-                0 => eprintln!("Didn't hit target with velocity: ({}, {})", vel_x, vel_y),
-                steps => (), //println!("Hit target with velocity: ({}, {}) after {} steps.", vel_x, vel_y, steps),
-            }
+        if x_set.len() > 0 {
+            count += x_set.len();
         }
     }
 
-    count
+    count + ((target_y.end - target_y.start + 1) * (target_x.end - target_x.start + 1)) as usize
 }
 
-// TODO: Ignore all y velocities which end up in target are y range after first step
-// all combinations that exist in that case can be calculated simply by 
-// (max_x_range - min_x_range) * (max_y_range - min_y_range)
-// these are all the y_velocities which are in min_y_range to max_y_range
-fn get_y_vels(min_y_range: i32, max_y_range: i32) -> Vec<i32> {
-    // since 124 - 69 = 55 < 69, there is a range of y_vel values between 123 and -123 where we overshoot after the last time before the target area.
-    let min_y_range = min_y_range.abs();
-    let max_y_range = max_y_range.abs();
-    let max_y_vel = min_y_range;
-    let range_y_max = max_y_range - 2; // end up one before target area
-    let range_y_min = (min_y_range - 1) / 2; // end up before target are so that |y_vel| + 2 + |y_vel| + 1 = |min_y_range| + 1
-
-    // todo, verify if this is correct
-    (min_y_range * -1..max_y_vel) // ((max_y_range - 2) * -1..max_y_vel) for optimizing if we really only calculate the number of combinations
-        .collect::<Vec<i32>>()
-        // .difference(&((range_y_min - 1..=range_y_max - 1).collect()))
-        // .map(|x| *x)
-        // .collect::<HashSet<i32>>()
-        // .difference(&(range_y_max * -1..=range_y_min * - 1).collect())
-        // .map(|x| *x)
-        // .collect()
+/// Returns an upper and lower bound for velocities in y direction which could hit the target area
+fn get_y_vels(min_y_range: i32, max_y_range: i32) -> Range<i32> {
+    max_y_range + 1..min_y_range.abs()
 }
 
 /// Calculates the number of steps to hit the target area, for a given velocity in y direction,
-/// which is known to be able to hit the target area
+/// If the given velocity doesn't hit the target, steps_min will be equal to steps_max
 fn n_steps_to_target(vel_y: f64, max_y: f64, min_y: f64) -> Range<i32> {
 
     let calc_high_to_target = |vel: f64, max: f64| {
-        let high_y = if vel > 0. { vel * (vel + 1.) / 2.} else { (vel.abs() - 1.) * vel.abs() / 2. };
+        let peak_y = if vel > 0. { vel * (vel + 1.) / 2.} else { (vel.abs() - 1.) * vel.abs() / 2. };
         let neg_offset = if vel >= 0. { 0. } else { vel.abs() - 1.};
-        // let max = if vel < 0. { max.abs() + (vel.abs() - 1.) * vel.abs() / 2. } else { max.abs() };
-        f64::sqrt(0.25 - 2. * -(high_y + max.abs())) - 0.5 - neg_offset
+        f64::sqrt(0.25 - 2. * -(peak_y + max.abs())) - 0.5 - neg_offset
     };
 
     let start_to_high = if vel_y < 0. { 0 } else { vel_y as i32 + 1};
@@ -84,22 +54,19 @@ fn n_steps_to_target(vel_y: f64, max_y: f64, min_y: f64) -> Range<i32> {
     steps_min..steps_max
 }
 
-fn x_distance_after_n_steps(n: i32, x_vel: i32) -> i32 {
-    n * x_vel - (n.pow(2) - n) / 2
-} 
-
-fn determine_n_x_vels(n: f64, min_x: f64, max_x: f64, range_any: (f64, f64)) -> Range<i32> {
-    if n >= range_any.1 {
-        return range_any.0 as i32..range_any.1 as i32; // maybe only call function if n < range_any.1 ?
+fn determine_n_x_vels(n: f64, min_x: f64, max_x: f64, range_any: &Range<i32>) -> Range<i32> {
+    if n >= range_any.end as f64{
+        return range_any.start..range_any.end;
     }
-    fn solve_vel_x(delim: f64, n: f64) -> f64 { // find out difference between inner function and closure
+
+    fn solve_vel_x(delim: f64, n: f64) -> f64 { 
         (2. * delim + n.powi(2) - n) / (2. * n) 
     }
 
     let max_vel_x = solve_vel_x(max_x + 1., n).ceil() as i32;
 
-    if n >= range_any.0 {
-        return range_any.0 as i32..max_vel_x
+    if n >= range_any.start as f64 {
+        return range_any.start..max_vel_x
     }
 
     let min_vel_x = solve_vel_x(min_x, n).ceil() as i32;
@@ -107,12 +74,11 @@ fn determine_n_x_vels(n: f64, min_x: f64, max_x: f64, range_any: (f64, f64)) -> 
     min_vel_x..max_vel_x
 }
 
-fn simulate((mut vel_x, mut vel_y): (i32, i32), range_x: Range<i32>, range_y: Range<i32>) -> usize {
+/// Helper function for verifying if calculated velocities actually land in the target area
+fn _simulate((mut vel_x, mut vel_y): (i32, i32), range_x: Range<i32>, range_y: Range<i32>) -> usize {
     let mut pos = (0, 0);
     let mut steps = 0;
-    if vel_y == -68 {
-        println!("vel is 68");
-    }
+
     while pos.0 < range_x.end || pos.1 > range_y.end {
         pos = (pos.0 + vel_x, pos.1 + vel_y);
         steps += 1;
@@ -133,30 +99,7 @@ fn simulate((mut vel_x, mut vel_y): (i32, i32), range_x: Range<i32>, range_y: Ra
 pub mod tests {
     use std::{collections::HashSet, ops::Range};
 
-    use super::{get_y_vels, n_steps_to_target, x_distance_after_n_steps, determine_n_x_vels};
-
-    fn create_test_range() -> (HashSet<i32>, HashSet<i32>) {
-        ((20..30).collect::<HashSet<_>>(), (-10..-8).collect::<HashSet<_>>())
-    }
-
-    #[test]
-    fn test_get_y_vels() {
-        let y_range = create_test_range().1;
-        let min_y_range = *y_range.iter().min().unwrap();
-        let max_y_range = *y_range.iter().max().unwrap();
-
-        let mut actual = get_y_vels(min_y_range, max_y_range);
-        actual.sort();
-        let expected = vec![-10, -9, -8, -3, -2, -1, 0, 1, 2, 7, 8, 9];
-
-        assert_eq!(actual, expected);
-
-        let mut actual_test = get_y_vels(-10, -5);
-        actual_test.sort();
-        let expected_test = vec![-10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-        assert_eq!(actual_test, expected_test);
-
-    }
+    use super::{n_steps_to_target, determine_n_x_vels};
 
     #[test]
     fn test_x_vels() {
@@ -246,36 +189,26 @@ pub mod tests {
     }
 
     #[test]
-    fn test_x_distance_after_n_steps() {
-        let actual = x_distance_after_n_steps(2, 7);
-        assert_eq!(actual, 7 + 6);
-
-        let actual = x_distance_after_n_steps(3, 5);
-        assert_eq!(actual, 5 + 4 + 3);
-    
-    }
-
-    #[test]
     fn test_determine_n_x_vels() {
         let solve_vel_x_less_n = |delim: f64| (-0.5 + f64::sqrt(0.25 + 4. * delim * 0.5));
     
         let min_x = 20.;
         let max_x = 30.;
 
-        let min_vel_x_less = solve_vel_x_less_n(min_x.into()).ceil();
-        let max_vel_x_less = solve_vel_x_less_n(max_x + 1.).ceil();    
-        let range_any = (min_vel_x_less, max_vel_x_less);
+        let min_vel_x_less = solve_vel_x_less_n(min_x.into()).ceil() as i32;
+        let max_vel_x_less = solve_vel_x_less_n(max_x + 1.).ceil() as i32;    
+        let range_any = min_vel_x_less..max_vel_x_less;
         
-        let one_actual = determine_n_x_vels(1., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let two_actual = determine_n_x_vels(2., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let three_actual = determine_n_x_vels(3., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let four_actual = determine_n_x_vels(4., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let five_actual = determine_n_x_vels(5., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let six_actual = determine_n_x_vels(6., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let seven_actual = determine_n_x_vels(7., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let nine_actual = determine_n_x_vels(9., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let ten_actual = determine_n_x_vels(10., min_x, max_x, range_any).collect::<HashSet<_>>();
-        let twelve_actual = determine_n_x_vels(12., min_x, max_x, range_any).collect::<HashSet<_>>();
+        let one_actual = determine_n_x_vels(1., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let two_actual = determine_n_x_vels(2., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let three_actual = determine_n_x_vels(3., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let four_actual = determine_n_x_vels(4., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let five_actual = determine_n_x_vels(5., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let six_actual = determine_n_x_vels(6., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let seven_actual = determine_n_x_vels(7., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let nine_actual = determine_n_x_vels(9., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let ten_actual = determine_n_x_vels(10., min_x, max_x, &range_any).collect::<HashSet<_>>();
+        let twelve_actual = determine_n_x_vels(12., min_x, max_x, &range_any).collect::<HashSet<_>>();
 
         
         // n = 1
@@ -363,38 +296,3 @@ pub mod tests {
         println!("20 {:?}", twenty_steps);
     }
 }
-
-
-// (20, -10), (21, -10), (22, -10), (23, -10), (24, -10), (25, -10), (26, -10), (27, -10), (28, -10), (29, -10), (30, -10), n = 1
-// (20, -9), (21, -9), (22, -9), (23, -9), (24, -9), (25, -9), (26, -9), (27, -9), (28, -9), (29, -9), (30, -9),            n = 1
-// (20, -8), (21, -8), (22, -8), (23, -8), (24, -8), (25, -8), (26, -8), (27, -8), (28, -8), (29, -8), (30, -8),            n = 1
-// (20, -7), (21, -7), (22, -7), (23, -7), (24, -7), (25, -7), (26, -7), (27, -7), (28, -7), (29, -7), (30, -7),            n = 1
-// (20, -6), (21, -6), (22, -6), (23, -6), (24, -6), (25, -6), (26, -6), (27, -6), (28, -6), (29, -6), (30, -6),            n = 1
-// (20, -5), (21, -5), (22, -5), (23, -5), (24, -5), (25, -5), (26, -5), (27, -5), (28, -5), (29, -5), (30, -5),            n = 1
-// (11, -4), (12, -4), (13, -4), (14, -4), (15, -4),                                                                        n = 2
-// (11, -3), (12, -3), (13, -3), (14, -3), (15, -3),                                                                        n = 2
-// (8, -2), (9, -2), (10, -2), (11, -2), (12, -2), (13, -2), (14, -2), (15, -2),                                            n = 2, 3
-// (7, -1), (8, -1), (9, -1), (10, -1), (11, -1),                                                                           n = 3, 4
-// (6, 0), (7, 0), (8, 0), (9, 0),                                                                                          n = 4, 5
-// (6, 1), (7, 1), (8, 1),                                                                                                  n = 5, 6
-// (6, 2), (7, 2),                                                                                                          n = 7
-// (6, 3), (7, 3),                                                                                                          n = 9
-// (6, 4), (7, 4),                                                                                                          n = 10
-// (6, 5), (7, 5),                                                                                                          n = 12
-// (6, 6), (7, 6),                                                                                                          n = 14
-// (6, 7), (7, 7),                                                                                                          n = 16
-// (6, 8), (7, 8),                                                                                                          n = 18
-// (6, 9), (7, 9)                                                                                                           n = 20
-
-// ...............................
-// S........................#.....
-// ...............................
-// ...............................
-// ...........................#...
-// ...............................
-// ....................TTTTTTTTTTT
-// ....................TTTTTTTTTTT
-// ....................TTTTTTTT#TT
-// ....................TTTTTTTTTTT
-// ....................TTTTTTTTTTT
-// ....................TTTTTTTTTTT

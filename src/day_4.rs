@@ -102,7 +102,7 @@ fn determine_last_winner(numbers: Vec<i32>, mut boards: Vec<Vec<BoardMap>>) -> i
 }
 
 
-fn print_board(board: &Vec<BoardMap>) {
+fn _print_board(board: &Vec<BoardMap>) {
     let mut board_string = String::new();
     for (i, (n, marked)) in board.iter().enumerate() {
         if i != 0 && i % 5 == 0 {
