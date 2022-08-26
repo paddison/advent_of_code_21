@@ -12,17 +12,21 @@ pub fn get_solution_1() -> u32 {
 }
 
 pub fn get_solution_2() -> u32 {
-    let numbers = include_str!("../data/day_18_test.txt").lines().map(|line| line.into()).collect::<Vec<SnailNumber>>();
-
+    let numbers = include_str!("../data/day_18.txt").lines().map(|line| line.into()).collect::<Vec<SnailNumber>>();
+    let mut max = 0;
     for n_outer in &numbers {
         for n_inner in &numbers {
             if n_outer != n_inner {
-                let n = 
+                let n = n_inner + n_outer;
+                let mag = n.magnitude();
+                if mag > max {
+                    max = mag;
+                }
             }
         }
     }
 
-    0
+    max
 }
 
 #[derive(Debug)]
@@ -108,13 +112,15 @@ impl SnailNumber {
             // build a new number and assign it to the old one
             let mut i = 0;
             let mut sn = SnailNumber::new();
+            let mut found_pair = false;
             while i < self.len() {
-                let n = if i < self.len() - 1 && self[i].level == self[i + 1].level {
+                let n = if !found_pair && i < self.len() - 1 && self[i].level == self[i + 1].level {
                     let n = Number { 
                         value: self[i].value * 3 + self[i + 1].value * 2,
                         level: self[i].level - 1,
                     };
                     i += 2;
+                    found_pair = true;
                     n
                 } else {
                     let n = self[i];
@@ -148,10 +154,22 @@ impl Display for SnailNumber {
 }
 
 impl Add for &SnailNumber {
-    type Output;
+    type Output = SnailNumber;
 
     fn add(self, rhs: Self) -> Self::Output {
-        todo!()
+        let mut value = vec![];
+        value.extend(self.value.clone());
+        value.extend(rhs.value.clone());
+
+        let mut sn = SnailNumber { value };
+
+        for n in sn.value.iter_mut() {
+            n.level += 1;
+        }
+        
+        while !sn.reduce() {}
+
+        sn
     }
 }
 
