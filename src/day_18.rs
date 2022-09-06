@@ -428,9 +428,9 @@ pub mod tests {
 }
 
 mod binary_tree_implementation_not_finished {
-    use std::ops::{AddAssign, Add};
+    use std::ops::Add;
 
-    struct SnailNumber {
+    struct _SnailNumber {
         root: NumberType,
     }
     
@@ -510,7 +510,7 @@ mod binary_tree_implementation_not_finished {
     
     #[cfg(test)]
     mod tests {
-        use super::{ SnailNumber, NumberType::{Regular, self}, NumberType::Pair };
+        use super::{ NumberType::{Regular, self}, NumberType::Pair };
     
     
         #[test]
