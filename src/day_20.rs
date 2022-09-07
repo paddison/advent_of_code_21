@@ -1,12 +1,13 @@
-use std::{fmt::Display, os};
+use std::fmt::Display;
 
-static N_ENHANCEMENTS: isize = 58;
+static N_ENHANCEMENTS: isize = 50;
 
 pub fn get_solution_1() -> usize {
     let (algorithm, mut image) = get_input();
     image.fit_for_enhancement();
+    // println!("{}", image);
     
-    for _ in 0..N_ENHANCEMENTS - 8 {
+    for _ in 0..N_ENHANCEMENTS {
         image.enhance_image(&algorithm);
         // println!("{}", image);
     }
@@ -73,7 +74,7 @@ impl BitMatrix {
         if remaining_shift != 0 {
             vals.push(n << remaining_shift); 
         }
-        
+    
         self.vals = vals;
         self.dim = (self.dim.0 + range as usize * 2 , self.dim.1 + range as usize * 2 );
     }
@@ -81,24 +82,24 @@ impl BitMatrix {
     fn count_pixels(&self) -> usize {
         let mut count = 0;
         
-        // for n in &self.vals {
-        //     let mut n = n.clone();
-        //     while n > 0 {
-        //         if n % 2 == 1 {
-        //             count += 1;
-        //         }
-        //         n >>= 1;
-        //     }
-        // }
-
-        for x in 8..self.dim.0 as isize - 8 {
-            for y in 8..self.dim.1 as isize - 8 {
-                count += match self.get(x, y) {
-                    Some(n) =>  n as usize,
-                    None => 0,
+        for n in &self.vals {
+            let mut n = n.clone();
+            while n > 0 {
+                if n % 2 == 1 {
+                    count += 1;
                 }
+                n >>= 1;
             }
         }
+
+        // for x in 0..self.dim.0 as isize {
+        //     for y in 0..self.dim.1 as isize {
+        //         count += match self.get(x, y) {
+        //             Some(n) =>  n as usize,
+        //             None => 0,
+        //         }
+        //     }
+        // }
         
         count
     }
@@ -187,13 +188,14 @@ impl Display for BitMatrix {
 // (x, y) = coordinate of center in window
 fn calculate_window(image: &BitMatrix, (x, y): (isize, isize)) -> isize {
     let mut algorithm_index = 0;
+    let is_even = image.scale_factor % 2 == 0; // on even enhancement steps everything outside the cave will be '.', on uneven '#'
 
     for row in y - 1..y + 2 {
         for col in x - 1..x + 2 {
             algorithm_index <<= 1;
             algorithm_index += match image.get(col, row) {
                 Some(bit) => bit as isize,
-                None => 0,
+                None => if is_even { 0 } else { 1 },
             }
         }
     }
@@ -326,7 +328,3 @@ mod tests {
     //     assert_eq!(image.count_pixels(), 35);
     // }
 }
-
-
-
-
