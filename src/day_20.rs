@@ -1,18 +1,16 @@
 use std::fmt::Display;
 
-static N_ENHANCEMENTS: isize = 2;
+static N_ENHANCEMENTS: isize = 50;
 static USIZE_LEN: usize = std::mem::size_of::<usize>() * 8;
-static FILL_BIT_MODULO: usize = 1;
+static FILL_BIT_MODULO: usize = 2;
 
 pub fn get_solution_1() -> usize {
-    let (algorithm, mut image) = get_test_input();
+    let (algorithm, mut image) = get_input();
     image.fit_for_enhancement();
 
-    println!("{:064b}", image.vals[0]);
-    // for _ in 0..N_ENHANCEMENTS {
-    //     image.enhance_image(&algorithm);
-
-    // }
+    for _ in 0..N_ENHANCEMENTS {
+        image.enhance_image(&algorithm);
+    }
     // println!("{}", image);
     
     image.count_pixels()
@@ -35,7 +33,7 @@ impl BitMatrix {
         }
          
         // determine bit we need to get
-        let i = Self::get_actual_index(self.dim.0, y as usize, x as usize);
+        let i = Self::get_actual_index(self.dim.0, x as usize, y as usize);
         
         // get number from vals field
         let n = *self.vals.get(i >> 6)?;
@@ -57,17 +55,19 @@ impl BitMatrix {
         if x < 0 {
             let i = Self::get_actual_index(self.dim.0, (x + 1) as usize, y as usize);
             let n = *self.vals.get(i >> 6).unwrap(); // unwrap should be safe since we check for y >= self.dim.1 before
-            return fill_bit * 4 + (n >> USIZE_LEN - 2);
+            let bit_index = i % USIZE_LEN;
+
+            return (fill_bit << 2) | ((n << bit_index) >> USIZE_LEN - 2);
         }
         let i = Self::get_actual_index(self.dim.0, x as usize, y as usize);
         let n = *self.vals.get(i >> 6).unwrap(); // unwrap should be safe since we check for y >= self.dim.1 before
+        let bit_index = i % USIZE_LEN;
         
         // if the last bit is to the right of the image
-        if x >= self.dim.0 as isize - 2{ 
-            return fill_bit + (n & 3);
+        if x >= self.dim.0 as isize - 2 {
+            return (((n << bit_index) >> USIZE_LEN - 2) << 1) + fill_bit;
         }
 
-        let bit_index = i % USIZE_LEN;
         let rev_bit_index = USIZE_LEN - bit_index;
         
         // if we need to cross the usize boundary
@@ -78,16 +78,13 @@ impl BitMatrix {
             // extract the first 3 - rev_bit_index bits of adjacent number (adj_n)
             (adj_n >> USIZE_LEN - (3 - rev_bit_index))
         } else {
-            let first = n << bit_index;
-            println!("{}", first);
-            println!("{}", first  >> (USIZE_LEN - 2));
-            first  >> (USIZE_LEN - 2)
+            n << bit_index >> (USIZE_LEN - 3)
         } 
     }
 
     #[inline(always)]
     fn get_actual_index(dim: usize, x: usize, y: usize) -> usize {
-        dim * y as usize + x as usize
+        dim * y + x
     }
 
     fn fit_for_enhancement(&mut self) {
@@ -112,9 +109,9 @@ impl BitMatrix {
                 } 
             }
         }
-        let remaining_shift = count % USIZE_LEN;
+        let remaining_shift = USIZE_LEN - count;
         if remaining_shift != 0 {
-            vals.push(n << remaining_shift); 
+            vals.push(n.overflowing_shl(remaining_shift as u32).0); 
         }
     
         self.vals = vals;
@@ -163,9 +160,9 @@ impl BitMatrix {
                 } 
             }
         }
-        let remaining_shift = count % USIZE_LEN;
+        let remaining_shift = USIZE_LEN - count;
         if remaining_shift != 0 {
-            vals.push(n << remaining_shift); // TODO verify this
+            vals.push(n.overflowing_shl(remaining_shift as u32).0); // TODO verify this
         }
         self.vals = vals;
         self.scale_factor += 1;
@@ -219,8 +216,8 @@ impl Display for BitMatrix {
 
 // (x, y) = coordinate of center in window
 fn calculate_window(image: &BitMatrix, (x, y): (isize, isize)) -> isize {
-    let mut index = 0;
-    let fill_bit = (image.scale_factor % FILL_BIT_MODULO) as isize; // on even enhancement steps everything outside the cave will be '.', on uneven '#'
+    // let mut index = 0;
+    // let fill_bit = (image.scale_factor % FILL_BIT_MODULO) as isize; // on even enhancement steps everything outside the cave will be '.', on uneven '#'
 
 
     // for row in y - 1..y + 2 {
@@ -238,8 +235,7 @@ fn calculate_window(image: &BitMatrix, (x, y): (isize, isize)) -> isize {
         index <<= 3;
         index += image.get_triple(x - 1, row);
     }
-        // println!("{}", index);
-    // algorithm_index
+    // println!("{}", index);
     index as isize
 }
 
@@ -343,14 +339,16 @@ mod tests {
 
     #[test]
     fn test_get_triple() {
+
         let bm = BitMatrix { vals: vec![2, 2_usize.pow(63) + 2_usize.pow(62), 2_usize.pow(63) + 2_usize.pow(62) + 7, 2], dim: (128, 2), scale_factor: 1};
+        println!("{}", bm);
 
         // cross number 
-        assert_eq!(bm.get_triple(126, 1), 3);
+        assert_eq!(bm.get_triple(126, 1), 5);
         assert_eq!(bm.get_triple(-1, 1), 7);
         assert_eq!(bm.get_triple(62, 0), 5);
         assert_eq!(bm.get_triple(63, 0), 3);
-        assert_eq!(bm.get_triple(64, 0), 6);
+        assert_eq!(bm.get_triple(64, 0), 3);
         assert_eq!(bm.get_triple(0, -1), 7);
         assert_eq!(bm.get_triple(0, 129), 7);
     }
@@ -359,8 +357,8 @@ mod tests {
     fn test_shifts() {
         let n: usize = 0b000000000_000000000_001001000_001000000_001100100_000010000_000011100_0;
         // let n2: usize = 0b11100000000100000000011000010001000000101000
-        assert_eq!(n, 15397464117288);
-        println!("{}", n);
+        // assert_eq!(n, 15397464117288);
+        // println!("{}", n);
         let index = 19;
         
         assert_eq!(n << index >> USIZE_LEN - 3, 2);
