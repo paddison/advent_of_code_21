@@ -216,26 +216,13 @@ impl Display for BitMatrix {
 
 // (x, y) = coordinate of center in window
 fn calculate_window(image: &BitMatrix, (x, y): (isize, isize)) -> isize {
-    // let mut index = 0;
-    // let fill_bit = (image.scale_factor % FILL_BIT_MODULO) as isize; // on even enhancement steps everything outside the cave will be '.', on uneven '#'
-
-
-    // for row in y - 1..y + 2 {
-    //     for col in x - 1..x + 2 {
-    //         index <<= 1;
-    //         index += match image.get(col, row) {
-    //             Some(bit) => bit as isize,
-    //             None => fill_bit,
-    //         }
-    //     }
-    // }
-
     let mut index = 0;
+
     for row in y - 1..y + 2 {
         index <<= 3;
         index += image.get_triple(x - 1, row);
     }
-    // println!("{}", index);
+    
     index as isize
 }
 
@@ -321,21 +308,6 @@ mod tests {
         let (_, image) = get_test_input();
         assert_eq!(image.count_pixels(), 10);
     }
-
-    // #[test]
-    // fn test_enhance_image() {
-    //     let (algorithm, image) = get_test_input();
-    //     println!("{}", algorithm.get(256, 0).unwrap());
-    //     println!("{}", image);
-
-    //     let image = enhance_image(&algorithm, image);
-    //     println!("{}", image);
-
-    //     let image = enhance_image(&algorithm, image);
-    //     println!("{}", image);
-
-    //     assert_eq!(image.count_pixels(), 35);
-    // }
 
     #[test]
     fn test_get_triple() {
