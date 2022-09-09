@@ -6,12 +6,10 @@ static FILL_BIT_MODULO: usize = 2;
 
 pub fn get_solution_1() -> usize {
     let (algorithm, mut image) = get_input();
-    image.fit_for_enhancement();
 
     for _ in 0..N_ENHANCEMENTS {
         image.enhance_image(&algorithm);
     }
-    // println!("{}", image);
     
     image.count_pixels()
 }
@@ -38,7 +36,18 @@ impl BitMatrix {
         // get number from vals field
         let n = *self.vals.get(i >> 6)?;
         let bit_index = i % USIZE_LEN;
-        Some((n << bit_index) >> USIZE_LEN - 1)
+        Some((n >> USIZE_LEN - 1 - bit_index) & 1)
+    }
+
+    /// Gets the value at (x, y), panics if index out of bounds
+    fn _get_unchecked(&self, x: usize, y: usize) -> usize {
+        // determine bit we need to get
+        let i = Self::get_actual_index(self.dim.0, x, y);
+    
+        // get number from vals field
+        let n = self.vals[i >> 6];
+        let bit_index = i % USIZE_LEN;
+        (n >> USIZE_LEN - 1 - bit_index) & 1
     }
 
     // returns three bits starting from (x, y)
@@ -49,23 +58,21 @@ impl BitMatrix {
         if y >= self.dim.1 as isize || y < 0 {
             return fill_bit * 7;
         } 
-        // determine starting bit bit we need to get
-        
-        // if we're at the bit on the left of the image
-        if x < 0 {
-            let i = Self::get_actual_index(self.dim.0, (x + 1) as usize, y as usize);
-            let n = *self.vals.get(i >> 6).unwrap(); // unwrap should be safe since we check for y >= self.dim.1 before
-            let bit_index = i % USIZE_LEN;
 
-            return (fill_bit << 2) | ((n << bit_index) >> USIZE_LEN - 2);
-        }
-        let i = Self::get_actual_index(self.dim.0, x as usize, y as usize);
+        // determine starting bit bit we need to get
+        let i = Self::get_actual_index(self.dim.0, std::cmp::max(x, 0) as usize, y as usize);
         let n = *self.vals.get(i >> 6).unwrap(); // unwrap should be safe since we check for y >= self.dim.1 before
         let bit_index = i % USIZE_LEN;
         
+        // if we're at the bit on the left of the image
+        if x < 0 {
+            return fill_bit * if x == -1 { 4 } else { 6 } | (n << bit_index >> USIZE_LEN - (3 + x) as usize )
+        }      
         // if the last bit is to the right of the image
         if x >= self.dim.0 as isize - 2 {
-            return (((n << bit_index) >> USIZE_LEN - 2) << 1) + fill_bit;
+            let shift = self.dim.0 - x as usize;
+
+            return (n << bit_index >> USIZE_LEN - shift << 3 - shift) | fill_bit * if shift == 1 { 3 } else { 1 };
         }
 
         let rev_bit_index = USIZE_LEN - bit_index;
@@ -78,7 +85,7 @@ impl BitMatrix {
             // extract the first 3 - rev_bit_index bits of adjacent number (adj_n)
             (adj_n >> USIZE_LEN - (3 - rev_bit_index))
         } else {
-            n << bit_index >> (USIZE_LEN - 3)
+            n >> USIZE_LEN - 3 - bit_index & 7
         } 
     }
 
@@ -87,46 +94,14 @@ impl BitMatrix {
         dim * y + x
     }
 
-    fn fit_for_enhancement(&mut self) {
-        let mut vals = vec![];
-        let mut count = 0;
-        let mut n = 0;
-        let range = N_ENHANCEMENTS;
-        
-        for y in -range..self.dim.1 as isize + range {
-            for x in -range..self.dim.0 as isize + range {
-                count += 1;
-                
-                n <<= 1;
-                if let Some(val) = self.get(x, y) {
-                    n += val;
-                }
-                
-                if count == USIZE_LEN {
-                    vals.push(n);
-                    n = 0;
-                    count = 0;
-                } 
-            }
-        }
-        let remaining_shift = USIZE_LEN - count;
-        if remaining_shift != 0 {
-            vals.push(n.overflowing_shl(remaining_shift as u32).0); 
-        }
-    
-        self.vals = vals;
-        self.dim = (self.dim.0 + range as usize * 2 , self.dim.1 + range as usize * 2 );
-    }
-
     fn count_pixels(&self) -> usize {
         let mut count = 0;
 
-        for x in 0..self.dim.0 as isize {
-            for y in 0..self.dim.1 as isize {
-                count += match self.get(x, y) {
-                    Some(n) => n as usize,
-                    None => 0,
-                }
+        for val in &self.vals {
+            let mut n = *val;
+            while n > 0 {
+                count += 1 & n;
+                n >>= 1;
             }
         }
         
@@ -135,21 +110,17 @@ impl BitMatrix {
 
     fn enhance_image(&mut self, algorithm: &BitMatrix) {
         // new bitmatrix is going to be larger by two in each dimension
-        if self.scale_factor as isize >= N_ENHANCEMENTS {
-            eprintln!("Enhancing image further will lead to incorrect results");
-            std::process::exit(1);
-        }
-
         let mut vals = vec![];
         let mut count = 0;
         let mut n = 0;
-        for y in 0..self.dim.1 as isize {
-            for x in 0..self.dim.0 as isize {
+
+        for y in -1..self.dim.1 as isize + 1 {
+            for x in -1..self.dim.0 as isize + 1 {
+                let algorithm_index = self.calculate_algorithm_index(x, y);
                 count += 1;
-      
                 n <<= 1;
-                let algorithm_index = calculate_window(&self, (x, y));
-                if let Some(val) = algorithm.get(algorithm_index, 0) {
+
+                if let Some(val) = algorithm.get(algorithm_index as isize, 0) {
                     n += val;
                 }
     
@@ -161,11 +132,26 @@ impl BitMatrix {
             }
         }
         let remaining_shift = USIZE_LEN - count;
+
         if remaining_shift != 0 {
-            vals.push(n.overflowing_shl(remaining_shift as u32).0); // TODO verify this
+            vals.push(n << remaining_shift);
         }
+
         self.vals = vals;
+        self.dim = (self.dim.0 + 2, self.dim.1 + 2);
         self.scale_factor += 1;
+    }
+
+
+    // (x, y) = coordinate of center in window
+    fn calculate_algorithm_index(&self, x: isize, y: isize) -> usize {
+        let mut index = 0;
+
+        for row in y - 1..y + 2 {
+            index <<= 3;
+            index += self.get_triple(x - 1, row);
+        }
+        index
     }
 }
 
@@ -214,18 +200,6 @@ impl Display for BitMatrix {
     }
 }
 
-// (x, y) = coordinate of center in window
-fn calculate_window(image: &BitMatrix, (x, y): (isize, isize)) -> isize {
-    let mut index = 0;
-
-    for row in y - 1..y + 2 {
-        index <<= 3;
-        index += image.get_triple(x - 1, row);
-    }
-    
-    index as isize
-}
-
 /// Returns (algorithm, Image)
 fn get_input() -> (BitMatrix, BitMatrix) {
     let input = include_str!("../data/day_20.txt");
@@ -234,16 +208,9 @@ fn get_input() -> (BitMatrix, BitMatrix) {
     (input[..split_index + 1].into(), input[split_index + 2..].into())
 }
 
-fn get_test_input() -> (BitMatrix, BitMatrix) {
-    let input = include_str!("../data/day_20_test.txt");
-    let split_index = input.find('\n').unwrap();
-
-    (input[..split_index + 1].into(), input[split_index + 2..].into())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{BitMatrix, calculate_window, USIZE_LEN};
+    use super::{BitMatrix, USIZE_LEN};
 
     fn get_test_string() -> &'static str {
 "#..#.
@@ -263,15 +230,12 @@ mod tests {
     #[test]
     fn test_bit_matrix_from_string() {
         let bm: BitMatrix = get_test_string().into();
-
-        println!("{:?}", bm);
         assert_eq!(bm.dim, (5, 5));
     }
 
     #[test]
     fn test_bit_matrix_get_is_some() {
         let bm: BitMatrix = get_test_string().into();
-        println!("{}", bm);
         assert_eq!(bm.get(0, 0), Some(1));
         assert_eq!(bm.get(1, 0), Some(0));
         assert_eq!(bm.get(4, 2), Some(1));
@@ -282,25 +246,14 @@ mod tests {
     #[test]
     fn test_bit_matrix_get_is_none() {
         let bm: BitMatrix = get_test_string().into();
-
         assert!(bm.get(4,5).is_none());
         assert!(bm.get(5,0).is_none());
     }
 
     #[test]
-    fn test_get_input() {
-        let (algorithm, mut image) = get_test_input();
-        image.fit_for_enhancement();
-        image.enhance_image(&algorithm);
-        // println!("{:?}", algorithm);
-        println!("{}", image);
-    }
-
-    #[test]
     fn test_calculate_window() {
         let image: BitMatrix = get_test_string().into();
-
-        assert_eq!(calculate_window(&image, (2, 2)), 34);
+        assert_eq!(image.calculate_algorithm_index(2, 2), 34);
     }
 
     #[test]
@@ -313,14 +266,12 @@ mod tests {
     fn test_get_triple() {
 
         let bm = BitMatrix { vals: vec![2, 2_usize.pow(63) + 2_usize.pow(62), 2_usize.pow(63) + 2_usize.pow(62) + 7, 2], dim: (128, 2), scale_factor: 1};
-        println!("{}", bm);
 
-        // cross number 
         assert_eq!(bm.get_triple(126, 1), 5);
         assert_eq!(bm.get_triple(-1, 1), 7);
         assert_eq!(bm.get_triple(62, 0), 5);
         assert_eq!(bm.get_triple(63, 0), 3);
-        assert_eq!(bm.get_triple(64, 0), 3);
+        assert_eq!(bm.get_triple(64, 0), 6);
         assert_eq!(bm.get_triple(0, -1), 7);
         assert_eq!(bm.get_triple(0, 129), 7);
     }
@@ -328,11 +279,25 @@ mod tests {
     #[test]
     fn test_shifts() {
         let n: usize = 0b000000000_000000000_001001000_001000000_001100100_000010000_000011100_0;
-        // let n2: usize = 0b11100000000100000000011000010001000000101000
-        // assert_eq!(n, 15397464117288);
-        // println!("{}", n);
+        
         let index = 19;
         
         assert_eq!(n << index >> USIZE_LEN - 3, 2);
+
+        let fill_bit = 1;
+        let x_larger_by = 1;
+        assert_eq!(fill_bit * ((1 << 3 - x_larger_by) - 1), 3);
+        let x_larger_by = 2;
+        assert_eq!(fill_bit * ((1 << 3 - x_larger_by) - 1), 1);
+        
+        let n: usize = 11116172303001903548; 
+        let bit_index = 0; 
+        let x: isize = 2; 
+        let shift = 1;
+        let fill_bit = 1;
+        
+        assert_eq!((fill_bit * ((1 << x as usize) - 1) << 3 - x) | 
+                   (n << bit_index >> USIZE_LEN - shift), 7);
     }
+
 }
