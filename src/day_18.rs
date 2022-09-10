@@ -1,10 +1,11 @@
 use std::{ops::{Deref, DerefMut, Add}, fmt::Display};
+use std::fmt::Write as _;
 
 pub fn get_solution_1() -> u32 {
     let mut lines = include_str!("../data/day_18.txt").lines();
     let mut sn: SnailNumber = lines.next().unwrap().into();
 
-    while let Some(next) = lines.next() {
+    for next in lines {
         sn += next.into();
     }
 
@@ -142,11 +143,11 @@ impl Display for SnailNumber {
         let mut _level = 0;
         let mut string = String::new();
         for n in self.iter() {
-            string += &format!("{:<2},", n.value);
+            let _ = write!(string, "{:<2},", n.value);
         }
         string += "\n";
         for n in self.iter() {
-            string += &format!("{:<2},", n.level);
+            let _ = write!(string, "{:<2},", n.level);
         }
 
         write!(f, "{}\n", string)

@@ -39,7 +39,7 @@ fn determine_beacons_and_scanners(mut scanners: Vec<Scanner>) -> Vec<(Scanner, P
         for (left, _) in &mut calculated_scanners {
             'outer: for (i, right) in scanners.iter_mut().enumerate() {
                 for j in 1..24 {
-                    let positions_map = create_positions_map(&left, right);
+                    let positions_map = create_positions_map(left, right);
                     if let Some(pos) = try_get_position(positions_map) {
                         calculate_absolute_beacon_positions(right, pos);
                         found_index = Some((i, pos));
@@ -62,7 +62,7 @@ fn parse_input() -> Vec<Scanner> {
     let mut scanners = vec![];
     let mut cur_scanner = vec![];
     for line in include_str!("../data/day_19.txt").split('\n').skip(1) {
-        if line.len() == 0 {
+        if line.is_empty() {
             continue;
         }
         if line.starts_with("---") {

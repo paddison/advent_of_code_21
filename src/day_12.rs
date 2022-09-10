@@ -84,11 +84,11 @@ impl Graph {
         // create lookup table
         let mut c = 2;
         for node in nodes.drain() {
-            if node != "start".to_string() && node != "end".to_string() {
+            if node != *"start" && node != *"end" {
                 tmp_table.insert(node.clone(), c);
                 l_table.insert(c, node);
                 c += 1;
-            } else if node == "start".to_string() {
+            } else if node == *"start" {
                 tmp_table.insert(node.clone(), 0);
                 l_table.insert(0, node);
             } else {
@@ -130,7 +130,7 @@ impl Graph {
                         }
                     }
                     new_path.push(node);
-                    Graph::build_paths(i, new_adj_matrix, &l_table, paths, new_path);
+                    Graph::build_paths(i, new_adj_matrix, l_table, paths, new_path);
                 }
             }
         }
@@ -173,7 +173,7 @@ impl Graph {
                         }
                     }
                     new_path.push(node);
-                    Graph::build_paths_2(i, new_adj_matrix, &l_table, paths, new_path, visited.clone(), new_threshold);
+                    Graph::build_paths_2(i, new_adj_matrix, l_table, paths, new_path, visited.clone(), new_threshold);
                 }
             }
         }
@@ -194,7 +194,7 @@ fn is_upper_string(s: &str) -> bool {
 fn parse_input(lines: Vec<String>) -> Vec<(String, String)> {
     let mut nodes = vec![];
     for line in lines {
-        let splits = line.split("-").collect::<Vec<&str>>();
+        let splits = line.split('-').collect::<Vec<&str>>();
         assert_eq!(2, splits.len());
         nodes.push((splits[0].to_string(), splits[1].to_string()));
     }

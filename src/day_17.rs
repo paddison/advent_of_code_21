@@ -19,13 +19,12 @@ pub fn get_solution_2() -> usize {
         for n in determine_n_steps_to_target(vel_y.into(), target_y.end.into(), target_y.start.into()) {
             let vel_xs = vel_xs_for_steps_map
                             .entry(n)
-                            .or_insert(
-                                determine_x_vels_from_n_steps(n.into(), target_x.start.into(), target_x.end.into(), &x_range_any)
+                            .or_insert_with(|| determine_x_vels_from_n_steps(n.into(), target_x.start.into(), target_x.end.into(), &x_range_any)
                                     .collect::<HashSet<_>>()
                             );
-            vel_x_set = vel_x_set.union(&vel_xs).map(|x| *x).collect();
+            vel_x_set = vel_x_set.union(vel_xs).copied().collect();
         }
-        if vel_x_set.len() > 0 {
+        if !vel_x_set.is_empty() {
             count += vel_x_set.len();
         }
     }

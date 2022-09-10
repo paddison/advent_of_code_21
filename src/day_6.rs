@@ -8,9 +8,7 @@ fn create_spawn_map(fish: Vec<u8>) -> HashMap<u8, u128> {
         *amount += 1;
     }
     for i in 0..9 {
-        if !spawn_map.contains_key(&i) {
-            spawn_map.insert(i, 0);
-        }
+        spawn_map.entry(i).or_insert(0);
     }
 
     spawn_map

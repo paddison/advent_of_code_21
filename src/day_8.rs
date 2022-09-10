@@ -114,7 +114,7 @@ impl From<&str> for Digit {
 pub fn get_solution_1() -> usize {
     let lines = parse_lines("data/day_8.txt");
     let digits: Vec<Vec<String>> = lines.into_iter().map(| l | {
-        let split_line: Vec<String> = l.split("|").map(| s | s.to_string()).collect();
+        let split_line: Vec<String> = l.split('|').map(| s | s.to_string()).collect();
         split_line[1].split_whitespace().map(| s | s.to_string()).filter(| n | {
             let length = n.len();
             length == 2 || length == 3 || length == 4 || length == 7
@@ -146,7 +146,7 @@ pub fn get_solution_2() -> u32 {
     // for a given set size
 
     let lines = parse_lines("data/day_8.txt");
-    let entries: Vec<Vec<String>> = lines.into_iter().map(|l| l.split("|").map(|n| n.to_string()).collect() ).collect();
+    let entries: Vec<Vec<String>> = lines.into_iter().map(|l| l.split('|').map(|n| n.to_string()).collect() ).collect();
     let mut sum = 0;
     for entry in entries {
         let (digits, number) = parse_to_digits(entry);

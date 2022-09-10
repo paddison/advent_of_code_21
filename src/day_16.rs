@@ -33,7 +33,7 @@ impl From<u8> for TypeID {
 
 pub fn get_solution_1() -> u32 {
     let input = include_str!("../data/day_16.txt");
-    let transmission = into_binary(&input);
+    let transmission = into_binary(input);
     let mut version_sum = 0;
     parse_package(&transmission, 0, &mut version_sum);
 
@@ -42,7 +42,7 @@ pub fn get_solution_1() -> u32 {
 
 pub fn get_solution_2() -> u64 {
     let input = include_str!("../data/day_16.txt");
-    let transmission = into_binary(&input);
+    let transmission = into_binary(input);
 
     parse_package(&transmission, 0, &mut 0).0
 }

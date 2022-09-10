@@ -137,7 +137,7 @@ impl<T: PartialOrd> HeightMap<T> {
                 },
             },
         }
-        neighbours.difference(explored).map(|n| *n).collect()
+        neighbours.difference(explored).copied().collect()
     }
 
 }
@@ -155,7 +155,7 @@ impl HeightMap<u8> {
     fn determine_basin_size(&self, low: usize) -> usize {
         let mut explored = HashSet::new();
         let mut frontier = vec![low];
-        while frontier.len() > 0 {
+        while !frontier.is_empty() {
             let next = frontier.pop().unwrap(); // unwrap is safe, since for loop doesn't run if frontier is empty
             explored.insert(next);
             let neighbours = self.get_unexplored_neighbours(next, &explored);

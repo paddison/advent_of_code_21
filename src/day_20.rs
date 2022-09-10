@@ -11,7 +11,7 @@ pub fn get_solution_1() -> usize {
         image.enhance_image(&algorithm);
     }
     
-    image.count_pixels()
+    image.count_lit_pixels()
 }
 
 // Implement map as bitmatrix
@@ -94,7 +94,7 @@ impl BitMatrix {
         dim * y + x
     }
 
-    fn count_pixels(&self) -> usize {
+    fn count_lit_pixels(&self) -> usize {
         let mut count = 0;
 
         for val in &self.vals {
@@ -171,7 +171,7 @@ impl From<&str> for BitMatrix {
             low += USIZE_LEN;
         }
         // shift the last entry so it fits to 8 bit
-        if !(low == lines.len()) {
+        if low != lines.len() {
             let last = vals.last_mut().unwrap();
             let shift = lines.len() % USIZE_LEN;
             *last <<= USIZE_LEN - shift;
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn test_image_count_lit_pixels() {
         let (_, image) = get_test_input();
-        assert_eq!(image.count_pixels(), 10);
+        assert_eq!(image.count_lit_pixels(), 10);
     }
 
     #[test]

@@ -166,7 +166,8 @@ fn create_map(lines: Vec<Line>) -> HashMap<(u32, u32), u32> {
 pub fn solve_5_1(file_name: &str) -> u32 {
     let raw_lines = parse_lines(file_name);
     let lines: Vec<Line> = raw_lines.into_iter()
-        .map(|line| Line::from(line))
+        .map(
+            Line::from)
         .filter(|line| line.is_horizontal() || line.is_vertical())
         .collect();
 
@@ -181,7 +182,7 @@ pub fn solve_5_1(file_name: &str) -> u32 {
 pub fn solve_5_2(file_name: &str) -> u32 {
     let raw_lines = parse_lines(file_name);
     let lines: Vec<Line> = raw_lines.into_iter()
-        .map(|line| Line::from(line))
+        .map(Line::from)
         .collect();
 
     let map = create_map(lines);
