@@ -70,8 +70,6 @@ impl Cuboid {
             return vec![self];
         }
 
-        // let intersection = self.intersection(intersection).unwrap();
-
         let mut split_cuboids = vec![];
 
         let min_x = if self[X][S] < intersection[X][S] {
@@ -112,15 +110,10 @@ impl Cuboid {
         if self[Z][E] > intersection[Z][E] {
             split_cuboids.push(Cuboid([[min_x, max_x], [min_y, max_y], [intersection[Z][E] + 1, self[Z][E]]]));     
         }
-        // println!("{:?}", split_cuboids);
+
         split_cuboids
     }
 
-    // fn does_not_overlap(&self, other: &Cuboid) -> bool {
-    //     (self[X].1 < other[X].0 || self[X].0 > other[X].1) ||
-    //     (self[Y].1 < other[Y].0 || self[Y].0 > other[Y].1) ||
-    //     (self[Z].1 < other[Z].0 || self[Z].0 > other[Z].1)
-    // }
     fn intersection(&self, other: &Cuboid) -> Option<Cuboid> {
         Some([
             [self[X][S].max(other[X][S]), self[X][E].min(other[X][E])],
