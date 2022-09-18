@@ -10,7 +10,6 @@ macro_rules! cub {
 }
 
 
-type Coordinates = (isize, isize, isize);
 type Instruction = (bool, Cuboid);
 type Grid = Vec<Cuboid>;
 
@@ -57,9 +56,6 @@ impl DerefMut for Cuboid {
 }
 
 impl Cuboid {
-    fn get_range(&self, index: usize) -> Range<isize> {
-        self.0[0][index]..self.0[1][index]
-    }
 
     fn count_cubes(&self) -> isize {
         (self[X][E] - self[X][S] + 1) *
@@ -130,7 +126,7 @@ impl Cuboid {
             [self[X][S].max(other[X][S]), self[X][E].min(other[X][E])],
             [self[Y][S].max(other[Y][S]), self[Y][E].min(other[Y][E])],
             [self[Z][S].max(other[Z][S]), self[Z][E].min(other[Z][E])]
-        ]).filter(|c| c.iter().all(|[start, end]| start < end))
+        ]).filter(|c| c.iter().all(|[start, end]| start <= end))
           .map(|cuboid| Cuboid(cuboid))
     }
 }
@@ -168,20 +164,6 @@ fn add_to_grid(cuboid: Cuboid, grid: &mut [Cuboid], added: &mut Vec<Cuboid>) {
         None => added.push(cuboid)
     }
 }
-
-fn add_to_grid_iterative(cuboid: Cuboid, grid: &[Cuboid]) -> Vec<Cuboid> {
-    let mut split_cubs = vec![cuboid];
-    for g_cub in grid {
-        let mut new_split_cubs = vec![];
-        for cub in split_cubs {
-            new_split_cubs.append(&mut cub.split(g_cub))
-        }   
-        split_cubs = new_split_cubs;
-    }
-
-    split_cubs
-}
-
 
 fn remove_from_grid(cuboid: Cuboid, grid: Grid, new_grid: &mut Grid) {
     for grid_cuboid in grid {
