@@ -1,4 +1,5 @@
 static BOARD_SIZE: usize = 10;
+static COUNTS_PER_ROLL: [usize; 7] = [1, 3, 6, 7, 6, 3, 1]; 
 
 fn get_input() -> Vec<Player> {
     include_str!("../data/day_21.txt")
@@ -80,17 +81,12 @@ impl Default for Dice {
 fn play_dirac(current_player: Player, previous_player: Player, current_player_wins: &mut usize, previous_player_wins: &mut usize, universe_count: usize) {
     if previous_player.score >= 21 {
         *previous_player_wins += universe_count;
-        return;
+    } else {
+        for score in 3..10 {
+            play_dirac(previous_player, do_dirac_turn(current_player, score), previous_player_wins, current_player_wins, universe_count * COUNTS_PER_ROLL[score - 3]); // 1 1 1 = 3
+        }
     }
 
-    // possible dice rolls
-    play_dirac(previous_player, do_dirac_turn(current_player, 3), previous_player_wins, current_player_wins, universe_count * 1); // 1 1 1 = 3
-    play_dirac(previous_player, do_dirac_turn(current_player, 4), previous_player_wins, current_player_wins, universe_count * 3);// 1 1 2 = 4
-    play_dirac(previous_player, do_dirac_turn(current_player, 5), previous_player_wins, current_player_wins, universe_count * 6);// 1 1 3 = 5
-    play_dirac(previous_player, do_dirac_turn(current_player, 6), previous_player_wins, current_player_wins, universe_count * 7);// 1 2 1 = 4
-    play_dirac(previous_player, do_dirac_turn(current_player, 7), previous_player_wins, current_player_wins, universe_count * 6);// 1 2 2 = 5
-    play_dirac(previous_player, do_dirac_turn(current_player, 8), previous_player_wins, current_player_wins, universe_count * 3);// 1 2 3 = 6
-    play_dirac(previous_player, do_dirac_turn(current_player, 9), previous_player_wins, current_player_wins, universe_count * 1);// 1 2 3 = 6
 }
 
 fn do_dirac_turn(mut player: Player, roll: usize) -> Player {
