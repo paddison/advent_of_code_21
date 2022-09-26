@@ -12,7 +12,7 @@ fn get_input() -> &'static str {
 
 struct Burrow {
     board: Vec<Vec<Tile>>,
-    amphipods: Vec<Amphipod>,
+    pods: Vec<Amphipod>,
 }
 
 impl Display for Burrow {
@@ -29,9 +29,8 @@ impl Display for Burrow {
             let _ = write!(board, "\n");
         }
 
-        for pod in &self.amphipods {
-            let index = pod.position.0 + pod.position.1 * BOARD_WIDTH + pod.position.1; // y position to account for \n chars
-            let c = board.get(index..index + 1);
+        for pod in &self.pods {
+            let index = pod.pos.0 + pod.pos.1 * BOARD_WIDTH + pod.pos.1; // y position to account for \n chars
             board.replace_range(index..index + 1, pod.p_type.into())
         }
 
@@ -84,7 +83,7 @@ impl From<&str> for Burrow {
                              .collect::<Vec<Amphipod>>();
 
         
-        Burrow { board, amphipods }
+        Burrow { board, pods: amphipods }
     }
 }
 
@@ -101,18 +100,39 @@ enum Tile {
 
 struct Amphipod {
     p_type: PodType,
-    position: (usize, usize),
-    is_outside: bool,
+    pos: (usize, usize),
+    has_moved: bool,
 }
 
 impl Amphipod {
     fn new(p_type: PodType, position: (usize, usize)) -> Self {
-        Self {p_type, position, is_outside: false }
+        Self {p_type, pos: position, has_moved: false }
     }
 
     fn cost(&self) -> usize {
         **self as usize
     }
+
+    fn can_move(&self) -> bool {
+        false
+    }
+
+    fn is_home(&self, burrow: &Burrow) -> bool {
+        if self.pos.1 == 1 {
+            return false;
+        }
+
+        // get all pods below our pod
+        for pod in burrow.pods
+                            .iter()
+                            .filter(|p| p.pos.0 == self.pos.0 && self.pos.1 > self.pos.1 && self.pos.1 > burrow.board.len()) {
+            if pod.p_type != self.p_type {
+                return false;
+            }
+        }
+
+        true
+    }           
 }
 
 impl Deref for Amphipod {
@@ -136,7 +156,7 @@ impl Display for Amphipod {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 enum PodType {
     Amber = 1,
     Bronze = 10,
@@ -189,7 +209,7 @@ mod tests {
     #[test]
     fn test_burrow_from_str() {
         let burrow: Burrow = get_test_input().into();
-        for p in burrow.amphipods.iter().map(|ap| ap.position) {
+        for p in burrow.pods.iter().map(|ap| ap.pos) {
             println!("{:?}", p);
         }
         println!("{}", burrow);
