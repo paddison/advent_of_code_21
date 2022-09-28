@@ -1,4 +1,4 @@
-use std::{ops::Deref, fmt::{Display, Formatter, Write}, path, collections::VecDeque};
+use std::{ops::Deref, fmt::{Display, Formatter, Write}, path, collections::VecDeque, env::home_dir};
 
 const BOARD_WIDTH: usize = 13;
 const ALL_POSITIONS: [(usize, usize); 15] = [
@@ -65,7 +65,7 @@ impl Burrow {
     fn organize_pods(initial: Pods, home: Pods) {
         let mut costs = vec![];
         for pod in &initial {
-            if let Some(cost) = Self::do_move(initial.clone(), vec![], home.clone(), 0) {
+            if let Some(cost) = Self::do_move(initial.clone(), vec![], home.clone(), 0, &mut []) {
                 costs.push(cost)
             }
         }
@@ -73,7 +73,7 @@ impl Burrow {
         println!("{:?}", costs);
     }
 
-    fn do_move(initial: Pods, moved: Pods, home: Pods, total_cost: usize) -> Option<usize> {
+    fn do_move(initial: Pods, moved: Pods, home: Pods, total_cost: usize, results: &mut [usize]) -> Option<usize> {
         if initial.len() == 0 && moved.len() == 0 {
             return Some(total_cost);
         }
@@ -234,10 +234,8 @@ impl Amphipod {
         // 3. check if hallway is free
 
         // check if pod can move:
-        if self.pos.0 > 1 {
-            if initial.iter().any(|pod| pod.pos.0 == self.pos.0 && pod.pos.1 < self.pos.1) {
-                return None;
-            }
+        if self.pos.0 > 1 && initial.iter().any(|pod| pod.pos.0 == self.pos.0 && pod.pos.1 < self.pos.1) {
+            return None;
         }
 
         // check if pod_home is free
@@ -254,63 +252,24 @@ impl Amphipod {
                                         .filter(|pod| pod.pos == pod_home[0] || pod.pos == pod_home[1])
                                         .collect::<Vec<&Amphipod>>(); 
 
-        let mut same_pod_type_in_home = None;
+        // check if home is free
+        let mut home_pos = pod_home[1];
 
         for pod in &other_pods_in_home {
             if self.p_type != pod.p_type {
                 return None
             } else {
-                same_pod_type_in_home = Some(*pod)
+                home_pos = (home_pos.0, home_pos.1 - 1)
             }
         }  
 
-        // get position where pod would end up in home
-        let home_pos = match same_pod_type_in_home {
-            Some(_) => pod_home[0],
-            None => pod_home[1],
-        };
-
         // check if there are any pods on path to pod_home in hallway
-        let lower_bound = self.pos.0.min(pod_home[0].0);
-        let upper_bound = self.pos.0.max(pod_home[0].0);
+        let lower_bound = self.pos.0.min(home_pos.0);
+        let upper_bound = self.pos.0.max(home_pos.0);
+
         if moved.iter().any(|pod| pod.pos.0 < upper_bound && pod.pos.0 > lower_bound) {
             return None
         }
-
-        
-        // // calculate all positions where other pods might be
-        // let mut path_to_home: Vec<(usize, usize)> = vec![];
-        // for x in self.pos.0.min(home_pos.0)..=self.pos.0.max(home_pos.0) {
-        //     // add all positions from the hallway
-        //     // tODO this is wrong maybe
-        //     path_to_home.append(
-        //         &mut ALL_POSITIONS
-        //             .iter()
-        //             .filter(|pos| pos.0 == x && pos.1 == 0)
-        //             .cloned()
-        //             .collect()
-        //     );
-        // }
-        // if self.pos.1 == 2 {
-        //     path_to_home.push((self.pos.0, 1));
-        // }
-        // if home_pos.1 == 2 {
-        //     path_to_home.push((home_pos.0, 1));
-        // }
-    
-        // // remove position of own pod from path_to_home
-        // if let Some(idx) = path_to_home.iter().position(|pos| pos == &self.pos) {
-        //     path_to_home.remove(idx);
-        // }
-
-        // // check if any pods are in the way
-        // for pos in path_to_home {
-        //     for pod in initial.iter().chain(moved) {
-        //         if pod.pos == pos {
-        //             return None;
-        //         }
-        //     }
-        // }
 
         Some((self.caclulate_move_cost(&home_pos), home_pos))
     }           
@@ -382,10 +341,22 @@ mod tests {
     use super::Amphipod;
     use super::Burrow;
     use super::PodType::*;
+    use super::Pods;
     use super::print_burrow;
 
     fn get_test_input() -> &'static str{
         include_str!("../data/day_23_test.txt")
+    }
+
+    // do this manually
+    fn create_test_data() -> (Pods, Pods) {
+        (
+            vec![
+                Amphipod::new(Bronze, (2, 1)), Amphipod::new(Copper, (4, 1)), Amphipod::new(Bronze, (6, 1)), Amphipod::new(Desert, (8, 1)),
+                Amphipod::new(Desert, (4, 2)), Amphipod::new(Amber, (8, 2))
+            ],
+            vec![Amphipod::new(Amber, (2, 2)), Amphipod::new(Copper, (6, 2))],
+        )
     }
 
     // helper function to prepare results for comparison
@@ -489,8 +460,6 @@ mod tests {
             }
         }
         let test_pod_initial = Amphipod::new(Amber, (8, 2));
-        let test_pod_moved = Amphipod::new(Amber, (9, 0));
-
         
         // no other pods, can get home
         verify_result(test_pod_initial.can_get_home(&vec![], &vec![], &vec![]), (2, 2), true);
@@ -504,7 +473,27 @@ mod tests {
         // pod is in initial and can't move outside
         verify_result(test_pod_initial.can_get_home(&vec![Amphipod::new(Bronze, (8, 1))], &vec![], &vec![]), (2, 1), false);
 
-        // some pods in hallway but not in the way
-        verify_result(test_pod_initial.can_get_home(&vec![Amphipod::new(Bronze, (8, 1))], &vec![], &vec![]), (2, 1), false);
+        // some pods in hallway and initial but not in the way
+        let test_pod_initial = Amphipod::new(Bronze, (8, 2));
+        let moved = vec![
+            Amphipod::new(Bronze, (9, 0)), 
+            Amphipod::new(Amber, (0, 1)), 
+        ];
+        let initial = vec![Amphipod::new(Bronze, (6, 2)), Amphipod::new(Desert, (6, 1))];
+        verify_result(test_pod_initial.can_get_home(&initial, &moved, &vec![]), (4, 2), true);
+
+        // pods in the way
+        let moved = vec![
+            Amphipod::new(Bronze, (7, 0))
+        ];
+        verify_result(test_pod_initial.can_get_home(&vec![], &moved, &vec![]), (4, 2), false);
+
+    }
+
+    #[test]
+    fn test_do_move() {
+        let (initial, home) = create_test_data();
+        let result = Burrow::do_move(initial, vec![], home, 0);
+        println!("{:?}", result)
     }
 }
