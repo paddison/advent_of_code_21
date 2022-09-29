@@ -1,4 +1,4 @@
-use std::{ops::Deref, fmt::{Display, Formatter, Write}, path, collections::VecDeque, env::home_dir};
+use std::{ops::Deref, fmt::{Display, Formatter, Write}, path, collections::{VecDeque, HashSet}, env::home_dir};
 
 const BOARD_WIDTH: usize = 13;
 const ALL_POSITIONS: [(usize, usize); 15] = [
@@ -7,7 +7,19 @@ const ALL_POSITIONS: [(usize, usize); 15] = [
     (2, 2), (4, 2), (6, 2), (8, 2), 
 ];
 
+use PodType::*;
+
+fn create_actual_data() -> Pods {
+    vec![
+        Amphipod::new(Amber, (4, 2)), Amphipod::new(Amber, (4, 1)),Amphipod::new(Desert, (8, 1)), Amphipod::new(Copper, (2, 1)),  Amphipod::new(Bronze, (6, 1)),
+        Amphipod::new(Copper, (2, 2)), Amphipod::new(Desert, (6, 2)), Amphipod::new(Bronze, (8, 2)),
+    ]
+}
+
 pub fn get_solution_1() -> usize {
+    let initial = create_actual_data();
+    let mut results = HashSet::new();
+    Burrow::do_move(initial, vec![], vec![], 0, &mut results);
     0
 }
 
@@ -63,19 +75,17 @@ fn print_burrow(initial: &Pods, moved: &Pods, home: &Pods) {
 
 impl Burrow {
     fn organize_pods(initial: Pods, home: Pods) {
-        let mut costs = vec![];
-        for pod in &initial {
-            if let Some(cost) = Self::do_move(initial.clone(), vec![], home.clone(), 0, &mut []) {
-                costs.push(cost)
-            }
-        }
 
-        println!("{:?}", costs);
+        Self::do_move(initial.clone(), vec![], home.clone(), 0);
+
+        println!("{:?}", 1);
     }
 
-    fn do_move(initial: Pods, moved: Pods, home: Pods, total_cost: usize, results: &mut [usize]) -> Option<usize> {
-        if initial.len() == 0 && moved.len() == 0 {
-            return Some(total_cost);
+    fn do_move(initial: Pods, moved: Pods, home: Pods, total_cost: usize) {
+        print_burrow(&initial, &moved, &home);
+
+        if initial.is_empty() && moved.is_empty() {
+            return
         }
 
         // first check if pods that haven't moved so far can get home (since this will lead to a minimal score)
@@ -87,9 +97,7 @@ impl Burrow {
                 let mut home_pod = new_initial.remove(i);
                 home_pod.pos = pos;
                 new_home.push(home_pod);
-                if let Some(cost) = Self::do_move(new_initial, moved.clone(), new_home, total_cost + cost) {
-                    return Some(cost)
-                }
+                Self::do_move(new_initial, moved.clone(), new_home, total_cost + cost)
             }
         }
 
@@ -102,52 +110,48 @@ impl Burrow {
                 let mut home_pod = new_moved.remove(i);
                 home_pod.pos = pos;
                 new_home.push(home_pod);
-                if let Some(cost) = Self::do_move(initial.clone(), new_moved, new_home, total_cost + cost) {
-                    return Some(cost)
-                }
+                Self::do_move(initial.clone(), new_moved, new_home, total_cost + cost)
             }
         }
 
-        // another approach would be to get all possible moves and choose the cheapest one
-        let mut possible_moves = vec![];
-        for (i, pod) in initial.iter().enumerate() {
-            for m in pod.get_possible_moves(&initial, &moved) {
-                possible_moves.push((i, m));
-            }
-        }
-        possible_moves.sort_by(|a, b| a.1.0.cmp(&b.1.0));
-        for (i, (cost, position)) in possible_moves {
-            let mut new_initial = initial.clone();
-            let mut new_moved = moved.clone();
-
-            let mut moved_pod = new_initial.remove(i);
-            moved_pod.pos = position;
-
-            new_moved.push(moved_pod);
-            if let Some(cost) = Self::do_move(new_initial, new_moved, home.clone(), total_cost + cost) {
-                return Some(cost)
-            }
-        }  
-
-        // move pod out of initial position
+        //another approach would be to get all possible moves and choose the cheapest one
+        // let mut possible_moves = vec![];
         // for (i, pod) in initial.iter().enumerate() {
-        //     // get possible moves needs to return possible moves sorted by cost
-        //     for (cost, position) in pod.get_possible_moves(&initial, &moved) {
-        //         // assign pod new position and move pod from initial to moved
-        //         let mut new_initial = initial.clone();
-        //         let mut new_moved = moved.clone();
-
-        //         let mut moved_pod = new_initial.remove(i);
-        //         moved_pod.pos = position;
-
-        //         new_moved.push(moved_pod);
-
-        //         if let Some(cost) = Self::do_move(new_initial, new_moved, home.clone(), total_cost + cost) {
-        //             return Some(cost)
-        //         }
+        //     for m in pod.get_possible_moves(&initial, &moved) {
+        //         possible_moves.push((i, m));
         //     }
         // }
-        None
+        // possible_moves.sort_by(|a, b| a.1.0.cmp(&b.1.0));
+        // possible_moves.sort_by(|a, b| initial[a.0].cost().cmp(&initial[b.0].cost()));
+        // for (i, (_, cost, position)) in possible_moves.into_iter() {
+        //     let mut new_initial = initial.clone();
+        //     let mut new_moved = moved.clone();
+
+        //     let mut moved_pod = new_initial.remove(i);
+        //     moved_pod.pos = position;
+
+        //     new_moved.push(moved_pod);
+        //     Self::do_move(new_initial, new_moved, home.clone(), total_cost + cost, results)
+        // }  
+
+        // move pod out of initial position
+        for (i, pod) in initial.iter().enumerate() {
+            // get possible moves needs to return possible moves sorted by cost
+            for (cost, position) in pod.get_possible_moves(&initial, &moved).into_iter() {
+                // assign pod new position and move pod from initial to moved
+                let mut new_initial = initial.clone();
+                let mut new_moved = moved.clone();
+
+                let mut moved_pod = new_initial.remove(i);
+                moved_pod.pos = position;
+
+                new_moved.push(moved_pod);
+
+                
+                Self::do_move(new_initial, new_moved, home.clone(), total_cost + cost)
+            }
+        }
+        // None
     }
 }
 
@@ -215,6 +219,8 @@ impl Amphipod {
                 }
             }
         }
+        let pod_home = self.get_pod_home();
+        // let distance_from_home = |(x, y): (usize, usize)| (y + x.abs_diff(pod_home[0].0) + 1) * self.cost();
 
         let mut with_costs = possible_positions
                                 .into_iter()
@@ -222,8 +228,17 @@ impl Amphipod {
                                 .collect::<Vec<(usize, (usize, usize))>>();
 
         // sorting is not strictly necessary (depends on approach used)
-        with_costs.sort_by(|a, b| a.0.cmp(&b.0));
+        with_costs.sort_by(|a, b| (a.0).cmp(&b.0));
         with_costs
+    }
+
+    fn get_pod_home(&self) -> [(usize, usize); 2] {
+        match self.p_type {
+            PodType::Amber => [(2, 1), (2, 2)],
+            PodType::Bronze => [(4, 1), (4, 2)],
+            PodType::Copper => [(6, 1), (6, 2)],
+            PodType::Desert => [(8, 1), (8, 2)],
+        }
     }
 
     // only gets called on pods that are in moved or initial
@@ -239,12 +254,7 @@ impl Amphipod {
         }
 
         // check if pod_home is free
-        let pod_home = match self.p_type {
-            PodType::Amber => [(2, 1), (2, 2)],
-            PodType::Bronze => [(4, 1), (4, 2)],
-            PodType::Copper => [(6, 1), (6, 2)],
-            PodType::Desert => [(8, 1), (8, 2)],
-        };
+        let pod_home = self.get_pod_home();
 
         // only pods in initial or home may be in pod_home
         let other_pods_in_home = initial.into_iter()
@@ -337,6 +347,8 @@ impl From<PodType> for &str {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::ALL_POSITIONS;
     use super::Amphipod;
     use super::Burrow;
@@ -352,11 +364,18 @@ mod tests {
     fn create_test_data() -> (Pods, Pods) {
         (
             vec![
-                Amphipod::new(Bronze, (2, 1)), Amphipod::new(Copper, (4, 1)), Amphipod::new(Bronze, (6, 1)), Amphipod::new(Desert, (8, 1)),
+                Amphipod::new(Bronze, (6, 1)), Amphipod::new(Bronze, (2, 1)), Amphipod::new(Copper, (4, 1)), Amphipod::new(Desert, (8, 1)),
                 Amphipod::new(Desert, (4, 2)), Amphipod::new(Amber, (8, 2))
             ],
             vec![Amphipod::new(Amber, (2, 2)), Amphipod::new(Copper, (6, 2))],
         )
+    }
+
+    fn create_actual_data() -> Pods {
+        vec![
+            Amphipod::new(Copper, (2, 1)), Amphipod::new(Amber, (4, 1)), Amphipod::new(Bronze, (6, 1)), Amphipod::new(Desert, (8, 1)),
+            Amphipod::new(Copper, (2, 2)), Amphipod::new(Amber, (4, 2)), Amphipod::new(Desert, (6, 2)), Amphipod::new(Bronze, (8, 2)),
+        ]
     }
 
     // helper function to prepare results for comparison
@@ -492,8 +511,10 @@ mod tests {
 
     #[test]
     fn test_do_move() {
+        // let (initial, home) = create_test_data();
         let (initial, home) = create_test_data();
-        let result = Burrow::do_move(initial, vec![], home, 0);
-        println!("{:?}", result)
+        let mut results = HashSet::new();
+        Burrow::do_move(initial, vec![], home, 0, &mut results);
+        println!("{:?}", results)
     }
 }
