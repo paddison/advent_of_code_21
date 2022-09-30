@@ -91,7 +91,6 @@ impl Burrow {
     fn organize_pods(initial: Pods, home: Pods) -> usize {
 
         let mut start = Burrow::new(initial, vec![], home, 0);
-        let mut visited = vec![start.clone()];
         start.add_neighbours();
         let mut burrows = vec![start];
         loop {
@@ -101,19 +100,15 @@ impl Burrow {
                     return burrow.cost;
                 }
 
-                // let mut count = 0;
-                if let Some((j, min)) = burrow.neighbours.as_ref().unwrap().iter().enumerate().find(|(_, burrow)| !visited.contains(burrow)) {
-                    new_burrows.push((i, j, min));
-
+                if let Some(min) = burrow.neighbours.as_ref().unwrap().get(0) {//.iter().enumerate().find(|(_, burrow)| !visited.contains(burrow)) {
+                    new_burrows.push((i, 0, min));
                 }
             }
 
             let (i, j, _) = new_burrows.into_iter().min_by(|(_, _, a), (_, _, b)| (a.cost + a.heuristic).cmp(&(b.cost + b.heuristic))).unwrap();
 
             let mut min = burrows[i].neighbours.as_mut().unwrap().remove(j);
-            // visited.push(min.clone()); 
             min.add_neighbours();
-            // println!("{}", min);
             
             burrows.push(min);
         }
