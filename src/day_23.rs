@@ -27,13 +27,19 @@ fn create_actual_data_2() -> Pods {
 }
 
 pub fn get_solution_1() -> usize {
+    unsafe {
+        HOME_SIZE = 2;
+    }
     let initial = create_actual_data();
-    Burrow::organize_pods(initial, vec![])
+    Burrow::organize_pods_queue(initial, vec![])
 }
 
 pub fn get_solution_2() -> usize {
+    unsafe {
+        HOME_SIZE = 4;
+    }
     let initial = create_actual_data_2();
-    Burrow::organize_pods(initial, vec![])
+    Burrow::organize_pods_queue(initial, vec![])
 }
 
 fn get_input() -> &'static str {
@@ -101,6 +107,26 @@ impl Burrow {
         self.initial.is_empty() && self.moved.is_empty()
     }
 
+    fn organize_pods_queue(initial: Pods, home: Pods) -> usize {
+        let mut queue = BinaryHeap::new();
+        let mut start = Burrow::new(initial, vec![], home, 0);
+        start.add_neighbours();
+
+        queue.push(Reverse(start));
+        
+        while let Some(burrow) = queue.pop() {
+            if burrow.0.is_organized() {
+                return burrow.0.cost;
+            }
+            for neighbour in &burrow.0.neighbours.unwrap() {
+                let mut n = neighbour.clone();
+                n.add_neighbours();
+                queue.push(Reverse(n))
+            }
+        }
+        0
+    }
+
     fn organize_pods(initial: Pods, home: Pods) -> usize {
         let mut queue = BinaryHeap::new();
         let mut start = Burrow::new(initial.clone(), vec![], home.clone(), 0);
@@ -110,7 +136,8 @@ impl Burrow {
         start.add_neighbours();
         let mut burrows = vec![start];
         loop {
-            let mut new_burrows = vec![];
+            let mut new_burrows = vec![]; 
+            
             for (i, burrow) in burrows.iter().enumerate() {
                 if burrow.is_organized() {
                     return burrow.cost;
@@ -621,15 +648,15 @@ mod tests {
     }
 
     #[test]
-    fn test_do_move() {
+    fn test_organize_pods() {
         unsafe {
-            HOME_SIZE = 2;
+            HOME_SIZE = 4;
         }
-        let (initial, home) = create_test_data();
+        let (initial, home) = create_test_data_2();
         // let initial = create_actual_data();
         // let home = vec![];
         // println!("{}", Burrow::new(initial, vec![], home, 0));
-        println!("{}", Burrow::organize_pods(initial, home));
+        println!("{}", Burrow::organize_pods_queue(initial, home));
         // unsafe {
         //     HOME_SIZE = 2;
         // }
