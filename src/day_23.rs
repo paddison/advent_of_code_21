@@ -1,4 +1,4 @@
-use std::{ops::{Deref, Index}, fmt::{Display, Formatter, Write}, path, collections::{VecDeque, HashSet, HashMap}, env::home_dir};
+use std::{ops::{Deref, Index}, fmt::{Display, Formatter, Write}, path, collections::{VecDeque, HashSet, HashMap, BinaryHeap}, env::home_dir, cmp::{Reverse, Ordering}};
 
 const BOARD_WIDTH: usize = 13;
 const ALL_POSITIONS: [(usize, usize); 15] = [
@@ -6,6 +6,7 @@ const ALL_POSITIONS: [(usize, usize); 15] = [
     (2, 1), (4, 1), (6, 1), (8, 1), 
     (2, 2), (4, 2), (6, 2), (8, 2), 
 ];
+static mut HOME_SIZE: usize = 2; 
 
 use PodType::*;
 
@@ -16,8 +17,22 @@ fn create_actual_data() -> Pods {
     ]
 }
 
+fn create_actual_data_2() -> Pods {
+    vec![
+        Amphipod::new(Copper, (2, 1)), Amphipod::new(Amber, (4, 1)), Amphipod::new(Bronze, (6, 1)), Amphipod::new(Desert, (8, 1)), 
+        Amphipod::new(Desert, (2, 2)), Amphipod::new(Copper, (4, 2)), Amphipod::new(Bronze, (6, 2)), Amphipod::new(Amber, (8, 2)), 
+        Amphipod::new(Desert, (2, 3)), Amphipod::new(Bronze, (4, 3)), Amphipod::new(Amber, (6, 3)), Amphipod::new(Copper, (8, 3)), 
+        Amphipod::new(Copper, (2, 4)), Amphipod::new(Amber, (4, 4)), Amphipod::new(Desert, (6, 4)), Amphipod::new(Bronze, (8, 4)),
+    ]
+}
+
 pub fn get_solution_1() -> usize {
     let initial = create_actual_data();
+    Burrow::organize_pods(initial, vec![])
+}
+
+pub fn get_solution_2() -> usize {
+    let initial = create_actual_data_2();
     Burrow::organize_pods(initial, vec![])
 }
 
@@ -51,7 +66,7 @@ fn get_input() -> &'static str {
 
 type Pods = Vec<Amphipod>;
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 struct Burrow {
     initial: Vec<Amphipod>,
     moved: Vec<Amphipod>,
@@ -61,18 +76,16 @@ struct Burrow {
     neighbours: Option<Vec<Burrow>>,
 }
 
-fn print_burrow(initial: &Pods, moved: &Pods, home: &Pods) {
-    let mut burrow_string = String::from(
-"#############
-#...........#
-###.#.#.#.###
-  #.#.#.#.#
-  #########");
-  for p in initial.iter().chain(moved).chain(home) {
-    let index = 1 + p.pos.0 + (p.pos.1 + 1) * BOARD_WIDTH + (p.pos.1 + 1);
-    burrow_string.replace_range(index..index + 1, p.p_type.into());
-  }
-  println!("{}", burrow_string);
+impl Ord for Burrow {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.cost + self.heuristic).cmp(&(other.cost + other.heuristic)) 
+    }
+}
+
+impl PartialOrd for Burrow {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        (self.cost + self.heuristic).partial_cmp(&(other.cost + other.heuristic))
+    }
 }
 
 impl Burrow {
@@ -89,8 +102,11 @@ impl Burrow {
     }
 
     fn organize_pods(initial: Pods, home: Pods) -> usize {
-
-        let mut start = Burrow::new(initial, vec![], home, 0);
+        let mut queue = BinaryHeap::new();
+        let mut start = Burrow::new(initial.clone(), vec![], home.clone(), 0);
+        let mut start2 = Burrow::new(initial, vec![], home, 0);
+        start2.add_neighbours();
+        queue.push(Reverse(start2));
         start.add_neighbours();
         let mut burrows = vec![start];
         loop {
@@ -109,17 +125,18 @@ impl Burrow {
 
             let mut min = burrows[i].neighbours.as_mut().unwrap().remove(j);
             min.add_neighbours();
-            
+            // println!("{}", min);
             burrows.push(min);
         }
     }
 
     fn min_cost_to_goal(&self) -> usize {
+
         let mut pod_homes = HashMap::from([
-            (Amber, vec![(2, 1), (2, 2)]),
-            (Bronze, vec![(4, 1), (4, 2)]),
-            (Copper, vec![(6, 1), (6, 2)]),
-            (Desert, vec![(8, 1), (8, 2)]),
+            (Amber, Amphipod::calculate_home(Amber)),
+            (Bronze, Amphipod::calculate_home(Bronze)),
+            (Copper, Amphipod::calculate_home(Copper)),
+            (Desert, Amphipod::calculate_home(Desert)),
         ]);
         // filter homes:
         for pod in &self.home {
@@ -127,6 +144,7 @@ impl Burrow {
             let idx = home.iter().position(|pos| &pod.pos == pos).unwrap();
             home.remove(idx);
         }
+
         let mut cost = 0;
         for pod in &self.initial {
             let home = pod_homes.get_mut(&pod.p_type).unwrap();
@@ -134,14 +152,14 @@ impl Burrow {
             if home_pos.0 == pod.pos.0 {
                 cost += (home_pos.1 + pod.pos.1 + 2) * pod.cost();
             } else {
-                cost += pod.caclulate_move_cost(&home_pos);
+                cost += pod.calculate_move_cost(&home_pos);
             }
         }
 
         for pod in &self.moved {
             let home = pod_homes.get_mut(&pod.p_type).unwrap();
             let pos = home.pop().unwrap();
-            cost += pod.caclulate_move_cost(&pos);
+            cost += pod.calculate_move_cost(&pos);
         }
         cost
     }
@@ -179,26 +197,6 @@ impl Burrow {
             }
         }
 
-        //another approach would be to get all possible moves and choose the cheapest one
-        // let mut possible_moves = vec![];
-        // for (i, pod) in initial.iter().enumerate() {
-        //     for m in pod.get_possible_moves(&initial, &moved) {
-        //         possible_moves.push((i, m));
-        //     }
-        // }
-        // possible_moves.sort_by(|a, b| a.1.0.cmp(&b.1.0));
-        // possible_moves.sort_by(|a, b| initial[a.0].cost().cmp(&initial[b.0].cost()));
-        // for (i, (_, cost, position)) in possible_moves.into_iter() {
-        //     let mut new_initial = initial.clone();
-        //     let mut new_moved = moved.clone();
-
-        //     let mut moved_pod = new_initial.remove(i);
-        //     moved_pod.pos = position;
-
-        //     new_moved.push(moved_pod);
-        //     Self::do_move(new_initial, new_moved, home.clone(), total_cost + cost, results)
-        // }  
-
         // move pod out of initial position
         let mut neighbours = Vec::new();
         for (i, pod) in self.initial.iter().enumerate() {
@@ -221,10 +219,6 @@ impl Burrow {
     }
 
     fn contains(lhs: &Pods, rhs: &Pods) -> bool {
-        if lhs.len() != rhs.len() {
-            return false;
-        }
-
         for pod in lhs {
             if !rhs.contains(pod) {
                 return false;
@@ -241,7 +235,9 @@ impl Display for Burrow {
 "#############
 #...........#
 ###.#.#.#.###
-  #.#.#.#.#
+  #.#.#.#.#  
+  #.#.#.#.#  
+  #.#.#.#.#  
   #########");
               for p in self.initial.iter().chain(&self.moved).chain(&self.home) {
                 let index = 1 + p.pos.0 + (p.pos.1 + 1) * BOARD_WIDTH + (p.pos.1 + 1);
@@ -251,9 +247,10 @@ impl Display for Burrow {
     }
 }
 
+
+
 impl PartialEq for Burrow {
     fn eq(&self, other: &Self) -> bool {
-
         Burrow::contains(&self.initial, &other.initial) &&
         Burrow::contains(&self.moved, &other.moved) &&
         Burrow::contains(&self.home, &other.home) &&
@@ -261,7 +258,7 @@ impl PartialEq for Burrow {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd)]
 struct Amphipod {
     p_type: PodType,
     pos: (usize, usize),
@@ -277,7 +274,7 @@ impl Amphipod {
     }
 
     // only gets called on pod that is in intial
-    fn caclulate_move_cost(&self, position: &(usize, usize)) -> usize {
+    fn calculate_move_cost(&self, position: &(usize, usize)) -> usize {
         let x_diff = self.pos.0.abs_diff(position.0);
         let y_diff = self.pos.1 + position.1;
 
@@ -288,8 +285,8 @@ impl Amphipod {
     fn get_possible_moves(&self, initial: &Pods, moved: &Pods) -> Vec<(usize, (usize, usize))> {
         // pod will always move into hallway
         // if pod is at y == 2, check if there is a pod above him, if so, return empty vec (pod cannot move)
-        if self.pos.1 == 2 {
-            if initial.iter().any(|pod| pod.pos == (self.pos.0, 1)) {
+        if self.pos.1 >= 2 {
+            if initial.iter().any(|pod| pod.pos.0 == self.pos.0 && pod.pos.1 < self.pos.1) {
                 return vec![]
             }
         }
@@ -317,26 +314,37 @@ impl Amphipod {
                 }
             }
         }
-        let pod_home = self.get_pod_home();
-        // let distance_from_home = |(x, y): (usize, usize)| (y + x.abs_diff(pod_home[0].0) + 1) * self.cost();
 
-        let mut with_costs = possible_positions
-                                .into_iter()
-                                .map(|pos| (self.caclulate_move_cost(&pos), pos))
-                                .collect::<Vec<(usize, (usize, usize))>>();
+        possible_positions
+            .into_iter()
+            .map(|pos| (self.calculate_move_cost(&pos), pos))
+            .collect::<Vec<(usize, (usize, usize))>>()
 
         // sorting is not strictly necessary (depends on approach used)
-        with_costs.sort_by(|a, b| (a.0).cmp(&b.0));
-        with_costs
+        // with_costs.sort_by(|a, b| (a.0).cmp(&b.0));
+        // with_costs
     }
 
-    fn get_pod_home(&self) -> [(usize, usize); 2] {
-        match self.p_type {
-            PodType::Amber => [(2, 1), (2, 2)],
-            PodType::Bronze => [(4, 1), (4, 2)],
-            PodType::Copper => [(6, 1), (6, 2)],
-            PodType::Desert => [(8, 1), (8, 2)],
+    fn calculate_home(p_type: PodType) -> Vec<(usize, usize)> {
+        let x = match p_type {
+            Amber => 2,
+            Bronze => 4,
+            Copper => 6,
+            Desert => 8,
+        };
+        unsafe {
+            (1..HOME_SIZE + 1).map(|y| (x, y)).collect::<Vec<(usize, usize)>>()
         }
+    }
+
+    fn get_pod_home(&self) -> Vec<(usize, usize)> {
+        Self::calculate_home(self.p_type)
+        // match self.p_type {
+        //     PodType::Amber => vec![(2, 1), (2, 2)],
+        //     PodType::Bronze => vec![(4, 1), (4, 2)],
+        //     PodType::Copper => vec![(6, 1), (6, 2)],
+        //     PodType::Desert => vec![(8, 1), (8, 2)],
+        // }
     }
 
     // only gets called on pods that are in moved or initial
@@ -347,7 +355,7 @@ impl Amphipod {
         // 3. check if hallway is free
 
         // check if pod can move:
-        if self.pos.0 > 1 && initial.iter().any(|pod| pod.pos.0 == self.pos.0 && pod.pos.1 < self.pos.1) {
+        if self.pos.0 > 1 && initial.iter().any(|other| other.pos.0 == self.pos.0 && other.pos.1 < self.pos.1) {
             return None;
         }
 
@@ -357,14 +365,14 @@ impl Amphipod {
         // only pods in initial or home may be in pod_home
         let other_pods_in_home = initial.into_iter()
                                         .chain(home)
-                                        .filter(|pod| pod.pos == pod_home[0] || pod.pos == pod_home[1])
+                                        .filter(|other| pod_home.contains(&other.pos))
                                         .collect::<Vec<&Amphipod>>(); 
 
         // check if home is free
-        let mut home_pos = pod_home[1];
+        let mut home_pos = *pod_home.last().unwrap();
 
-        for pod in &other_pods_in_home {
-            if self.p_type != pod.p_type {
+        for other in &other_pods_in_home {
+            if self.p_type != other.p_type {
                 return None
             } else {
                 home_pos = (home_pos.0, home_pos.1 - 1)
@@ -379,7 +387,7 @@ impl Amphipod {
             return None
         }
 
-        Some((self.caclulate_move_cost(&home_pos), home_pos))
+        Some((self.calculate_move_cost(&home_pos), home_pos))
     }           
 }
 
@@ -404,15 +412,7 @@ impl Display for Amphipod {
     }
 }
 
-impl TryFrom<(usize, char)> for Amphipod {
-    type Error = &'static str;
-
-    fn try_from(value: (usize, char)) -> Result<Self, Self::Error> {
-        todo!()
-    }
-} 
-
-#[derive(Copy, Clone, PartialEq, Hash, Eq)]
+#[derive(Copy, Clone, PartialEq, Hash, Eq, PartialOrd)]
 enum PodType {
     Amber = 1,
     Bronze = 10,
@@ -445,18 +445,15 @@ impl From<PodType> for &str {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
 
-    use super::ALL_POSITIONS;
+    use crate::day_23::HOME_SIZE;
+
     use super::Amphipod;
     use super::Burrow;
     use super::PodType::*;
     use super::Pods;
-    use super::print_burrow;
-
-    fn get_test_input() -> &'static str{
-        include_str!("../data/day_23_test.txt")
-    }
 
     // do this manually
     fn create_test_data() -> (Pods, Pods) {
@@ -466,6 +463,22 @@ mod tests {
                 Amphipod::new(Desert, (4, 2)), Amphipod::new(Amber, (8, 2))
             ],
             vec![Amphipod::new(Amber, (2, 2)), Amphipod::new(Copper, (6, 2))],
+        )
+    }
+
+    fn create_test_data_2() -> (Pods, Pods) {
+        // #B#C#B#D#
+        // #D#C#B#A#
+        // #D#B#A#C#
+        // #A#D#C#A#
+        (
+            vec![
+                Amphipod::new(Bronze, (2, 1)), Amphipod::new(Copper, (4, 1)), Amphipod::new(Bronze, (6, 1)), Amphipod::new(Desert, (8, 1)),
+                Amphipod::new(Desert, (2, 2)), Amphipod::new(Copper, (4, 2)), Amphipod::new(Bronze, (6, 2)), Amphipod::new(Amber, (8, 2)),
+                Amphipod::new(Desert, (2, 3)), Amphipod::new(Bronze, (4, 3)), Amphipod::new(Amber, (6, 3)), Amphipod::new(Copper, (8, 3)),
+                Amphipod::new(Desert, (4, 4)), Amphipod::new(Amber, (8, 4))
+            ],
+            vec![Amphipod::new(Amber, (2, 4)), Amphipod::new(Copper, (6, 4))]
         )
     }
 
@@ -505,7 +518,7 @@ mod tests {
             Amphipod::new(Desert, (10, 0)),
             ];
         
-        print_burrow(&initial, &vec![], &vec![]);
+        Burrow::new(initial, vec![], vec![], 0);
     }
 
     #[test]
@@ -520,10 +533,10 @@ mod tests {
         let right_down = (8, 1);
         let up_left_down = (2, 2);
 
-        assert_eq!(bronze.caclulate_move_cost(&right), 90);
-        assert_eq!(copper.caclulate_move_cost(&up_right), 300);
-        assert_eq!(desert.caclulate_move_cost(&right_down), 4000);
-        assert_eq!(amber.caclulate_move_cost(&up_left_down), 10);
+        assert_eq!(bronze.calculate_move_cost(&right), 90);
+        assert_eq!(copper.calculate_move_cost(&up_right), 300);
+        assert_eq!(desert.calculate_move_cost(&right_down), 4000);
+        assert_eq!(amber.calculate_move_cost(&up_left_down), 10);
     }
 
     #[test]
@@ -609,9 +622,34 @@ mod tests {
 
     #[test]
     fn test_do_move() {
+        unsafe {
+            HOME_SIZE = 2;
+        }
         let (initial, home) = create_test_data();
         // let initial = create_actual_data();
         // let home = vec![];
+        // println!("{}", Burrow::new(initial, vec![], home, 0));
         println!("{}", Burrow::organize_pods(initial, home));
+        // unsafe {
+        //     HOME_SIZE = 2;
+        // }
+    }
+
+    #[test]
+    fn test_burrow_in_bin_heap() {
+        let initial1 = create_actual_data();
+        let (initial2, home2) = create_test_data();
+        let burrow1 = Burrow::new(initial1.clone(), vec![], vec![], 200);
+        let burrow2 = Burrow::new(initial2, vec![], home2, 0);
+        let burrow3 = Burrow::new(initial1.clone(), vec![], vec![], 100);
+
+        let mut queue = BinaryHeap::new();
+        queue.push(Reverse(burrow1));
+        queue.push(Reverse(burrow2));
+        queue.push(Reverse(burrow3));
+
+        while let Some(burrow) = queue.pop() {
+            println!("{}\ncost: {}\nheuristic: {}", burrow.0, burrow.0.cost, burrow.0.heuristic);
+        }
     }
 }
