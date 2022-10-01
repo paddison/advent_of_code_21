@@ -1,6 +1,5 @@
 // parse input into range objects
-use crate::cub;
-use std::{ops::{Range, Deref, DerefMut}, fmt::Display};
+use std::{ops::{Deref, DerefMut}, fmt::Display};
 
 #[macro_export]
 macro_rules! cub {
