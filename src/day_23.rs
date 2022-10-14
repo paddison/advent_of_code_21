@@ -1,6 +1,5 @@
 use std::{ops::Deref, fmt::{Display, Formatter}, collections::{VecDeque, HashMap, BinaryHeap}, cmp::Ordering, hash::Hash};
-use PodType::*;
-
+use Type::*;
 
 const BOARD_WIDTH: usize = 13;
 static mut HOME_SIZE: usize = 2; 
@@ -26,7 +25,7 @@ pub fn get_solution_1() -> usize {
         HOME_SIZE = 2;
     }
     let initial = create_pods(2);
-    Burrow::organize_pods_queue(initial, vec![])
+    Burrow::organize_pods(initial, vec![])
 }
 
 pub fn get_solution_2() -> usize {
@@ -35,7 +34,7 @@ pub fn get_solution_2() -> usize {
     }
     let mut initial = create_pods(4);
     initial.append(&mut create_additional_pods());
-    Burrow::organize_pods_queue(initial, vec![])
+    Burrow::organize_pods(initial, vec![])
 }
 
 type Pods = Vec<Amphipod>;
@@ -69,7 +68,7 @@ impl Burrow {
         Burrow { pods, home, cost, estimated_cost: heuristic }
     }
 
-    fn organize_pods_queue(initial: Pods, home: Pods) -> usize {
+    fn organize_pods(initial: Pods, home: Pods) -> usize {
         let mut queue = BinaryHeap::new();
         let start = Burrow::new(initial, home, 0);
         let mut cost_cache: HashMap<String, usize> = HashMap::new();
@@ -98,7 +97,7 @@ impl Burrow {
         
         // filter homes:
         for pod in home.iter() {
-            let home =  pod_homes.get_mut(&pod.p_type).unwrap();
+            let home =  pod_homes.get_mut(&pod.typ).unwrap();
             if let Some(index) = home.iter().position(|pos| &pod.pos == pos) {
                 home.remove(index);
             }
@@ -106,7 +105,7 @@ impl Burrow {
 
         let mut cost = 0;
         for pod in pods {
-            let home = pod_homes.get_mut(&pod.p_type).unwrap();
+            let home = pod_homes.get_mut(&pod.typ).unwrap();
             let home_pos = home.pop().unwrap();
             if home_pos.0 == pod.pos.0 {
                 cost += (home_pos.1 + pod.pos.1 + 2) * pod.cost();
@@ -170,7 +169,7 @@ impl Burrow {
   #########");
         for p in self.pods.iter().chain(&self.home) {
         let index = 1 + p.pos.0 + (p.pos.1 + 1) * BOARD_WIDTH + (p.pos.1 + 1);
-        burrow_string.replace_range(index..index + 1, p.p_type.into());
+        burrow_string.replace_range(index..index + 1, p.typ.into());
         }
         burrow_string
     }
@@ -191,13 +190,13 @@ impl PartialEq for Burrow {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd)]
 struct Amphipod {
-    p_type: PodType,
+    typ: Type,
     pos: (usize, usize),
 }
 
 impl Amphipod {
-    fn new(p_type: PodType, position: (usize, usize)) -> Self {
-        Self {p_type, pos: position }
+    fn new(p_type: Type, position: (usize, usize)) -> Self {
+        Self {typ: p_type, pos: position }
     }
 
     fn cost(&self) -> usize {
@@ -253,8 +252,8 @@ impl Amphipod {
         possible_positions
     }
 
-    fn calculate_home(p_type: PodType) -> Vec<(usize, usize)> {
-        let x = match p_type {
+    fn calculate_home(typ: Type) -> Vec<(usize, usize)> {
+        let x = match typ {
             Amber => 2,
             Bronze => 4,
             Copper => 6,
@@ -266,16 +265,10 @@ impl Amphipod {
     }
 
     fn get_pod_home(&self) -> Vec<(usize, usize)> {
-        Self::calculate_home(self.p_type)
+        Self::calculate_home(self.typ)
     }
 
-    // only gets called on pods that are in moved or initial
     fn can_get_home(&self, pods: &Pods, home: &Pods) -> Option<(usize, usize)> {
-        // three steps:
-        // 1. check if pod can move (if it is in initial)
-        // 2. check if home is free
-        // 3. check if hallway is free
-
         // 1. check if pod can move:
         if self.pos.0 > 1 && pods.iter().any(|other| other.pos.0 == self.pos.0 && other.pos.1 < self.pos.1) {
             return None;
@@ -291,11 +284,11 @@ impl Amphipod {
 
         let y_pos = unsafe {
             HOME_SIZE - home.into_iter()
-                            .filter(|other| self.p_type == other.p_type)
+                            .filter(|other| self.typ == other.typ)
                             .count()
         };
 
-        let home_pos = match self.p_type {
+        let home_pos = match self.typ {
             Amber => (2, y_pos),
             Bronze => (4, y_pos),
             Copper => (6, y_pos),
@@ -315,20 +308,20 @@ impl Amphipod {
 }
 
 impl Deref for Amphipod {
-    type Target = PodType;
+    type Target = Type;
 
     fn deref(&self) -> &Self::Target {
-        &self.p_type
+        &self.typ
     }
 }
 
 impl Display for Amphipod {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-       let pod = match self.p_type {
-        PodType::Amber => "A",
-        PodType::Bronze => "B",
-        PodType::Copper => "C",
-        PodType::Desert => "D",
+       let pod = match self.typ {
+        Type::Amber => "A",
+        Type::Bronze => "B",
+        Type::Copper => "C",
+        Type::Desert => "D",
     };
 
         write!(f, "{}", pod)
@@ -336,32 +329,32 @@ impl Display for Amphipod {
 }
 
 #[derive(Copy, Clone, PartialEq, Hash, Eq, PartialOrd)]
-enum PodType {
+enum Type {
     Amber = 1,
     Bronze = 10,
     Copper = 100,
     Desert = 1000,
 }
 
-impl From<char> for PodType {
+impl From<char> for Type {
     fn from(c: char) -> Self {
         match c {
-            'A' => PodType::Amber,
-            'B' => PodType::Bronze,
-            'C' => PodType::Copper,
-            'D' => PodType::Desert,
+            'A' => Type::Amber,
+            'B' => Type::Bronze,
+            'C' => Type::Copper,
+            'D' => Type::Desert,
             _ => panic!("Invalid Char for Podtype")
         }
     }
 }
 
-impl From<PodType> for &str {
-    fn from(pod: PodType) -> Self {
+impl From<Type> for &str {
+    fn from(pod: Type) -> Self {
         match pod {
-            PodType::Amber => "A",
-            PodType::Bronze => "B",
-            PodType::Copper => "C",
-            PodType::Desert => "D",
+            Type::Amber => "A",
+            Type::Bronze => "B",
+            Type::Copper => "C",
+            Type::Desert => "D",
         }
     }
 }
@@ -374,8 +367,8 @@ mod tests {
 
     use super::Amphipod;
     use super::Burrow;
-    use super::PodType::*;
     use super::Pods;
+    use super::Type::*;
 
     // do this manually
     fn create_test_data() -> (Pods, Pods) {
@@ -536,7 +529,7 @@ mod tests {
         // let initial = create_actual_data();
         // let home = vec![];
         // println!("{}", Burrow::new(initial, vec![], home, 0));
-        println!("{}", Burrow::organize_pods_queue(initial, home));
+        println!("{}", Burrow::organize_pods(initial, home));
         // unsafe {
         //     HOME_SIZE = 2;
         // }
