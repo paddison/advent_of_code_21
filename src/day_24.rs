@@ -1,14 +1,90 @@
-use std::{ops::Deref, fmt::Display, collections::VecDeque, io::Write};
+use std::{ops::Deref, fmt::Display, collections::VecDeque};
 
 type Instruction = (IType, RType, Option<RType>);
 
 pub fn get_solution_1() -> usize {
-
+    let batches = parse_to_batches().into_iter().skip(5).collect::<Vec<Vec<Instruction>>>();
+    let candidates = get_first_five();
+    for (digit, z) in candidates.into_iter() {
+        println!("Digit: {:?}", digit);
+        if calculate_batch(&batches, z, vec![]) {
+            break;
+        }
+    }
     0
 }
 
+fn calculate_batch(batches: &[Vec<Instruction>], z: isize, others: Vec<isize>) -> bool {
+    if batches.len() == 0 {
+        println!("z: {}", z);
+        println!("Digits: {:?}", others);
+        return true;
+    }
+    for w in 1..10 {
+        // println!("Batch {} of 14", 15 - batches.len());
+        let mut new_others = others.clone();
+        new_others.push(w);
+        let (n, m) = get_variables(&batches[0]);
+        if let Some(z) = try_digit(z, n, m, w) {
+            if calculate_batch(&batches[1..], z, new_others.clone()) {
+                return true;
+            }
+        }
+    }
 
+    false
+}
 
+fn parse_to_batches() -> Vec<Vec<Instruction>> {
+    let instructions = parse();
+    let mut batches = Vec::new();
+    for n in 0..14 {
+        batches.push(instructions.iter().skip(n * 18).take(18).cloned().collect::<Vec<Instruction>>());
+    }
+    batches
+}
+
+fn get_variables(batch: &[Instruction]) -> (isize, isize) {
+    match (batch[5].2.unwrap(), batch[15].2.unwrap()) {
+        (RType::Const(n), RType::Const(m)) => (n, m),
+        _ => panic!("Invalid indices"),
+    }
+}
+
+fn try_digit(z: isize, n: isize, m: isize, w: isize) -> Option<isize> {
+    if n < 0 {
+        if (z % 26) + n == w {
+            Some(z / 26)
+        } else {
+            None
+        }
+    } else {
+        Some(26 * z + w + m)
+    }
+}
+
+fn get_first_five() -> Vec<(VecDeque<isize>, isize)> {
+    let mut valids = Vec::new();
+    for n in 11111..100000 {
+        let digits = deque_from_usize(n);
+        if digits.iter().take(5).find(|e| e == &&0).is_some() {
+            continue;
+        }
+        
+        let z = 26_isize.pow(4) * digits[0] + 
+                    26_isize.pow(3) * digits[1] + 
+                    26_isize.pow(2) * digits[2] +
+                    26 * digits[3] +
+                    digits[4] +
+                    2373828;
+        let mod_z = z % 26;
+        if mod_z <= 10 && mod_z >= 2 {
+            valids.push((digits, z));
+        }
+    }
+    println!("{}", valids.len());
+    valids
+}
 
 fn deque_from_usize(mut n: usize) -> VecDeque<isize> {
 
@@ -20,23 +96,6 @@ fn deque_from_usize(mut n: usize) -> VecDeque<isize> {
     while deque.len() < 14 {
         deque.push_back(0);
     }
-    deque
-}
-
-/// Builds a deque where every number is of value 'others', except the indexth value,
-/// which will be of value 'digit'
-fn deque_with_adjustable_digit(others: isize, digit: isize, index: usize) -> VecDeque<isize> {
-    assert!(index < 18);
-    let mut deque = VecDeque::new();
-
-    for i in 0..18 {
-        if i == index {
-            deque.push_back(digit);
-        } else {
-            deque.push_back(others)
-        }
-    }
-
     deque
 }
 
