@@ -84,10 +84,6 @@ impl Grid {
         }
     }
 
-    fn move_south(&mut self) {
-
-    }
-
     fn do_move(&mut self) -> bool {
         // move east first
         let mut east_grid = self.clone();
@@ -105,7 +101,7 @@ impl Grid {
         // move south
         let mut south_grid = east_grid.clone();
         for (row, col) in south_facing {
-            south_grid.try_move_cucumber(row, col, Cucumber::East)
+            south_grid.try_move_cucumber(row, col, Cucumber::South)
         }
         if self.grid == south_grid.grid {
             self.grid = south_grid.grid;
