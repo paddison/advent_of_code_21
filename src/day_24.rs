@@ -3,33 +3,52 @@ type Instruction = Vec<String>;
 pub fn get_solution_1() -> usize {
     let batches = parse_to_batches().into_iter().skip(5).collect::<Vec<Vec<Instruction>>>();
     let digits = FirstFive::new();
-    for (digit, z) in digits.into_iter() {
-        if calculate_batch(&batches, z, vec![]) {
-            println!("Digit: {:?}", digit);
-            break;
+    for (digit, z) in digits.rev() {
+        if let Some(other_digit) = calculate_batch(&batches, z, vec![]) {
+            return into_number(digit, other_digit)
         }
     }
-    0
+    unreachable!()
 }
 
-fn calculate_batch(batches: &[Vec<Instruction>], z: isize, others: Vec<isize>) -> bool {
+pub fn get_solution_2() -> usize {
+    let batches = parse_to_batches().into_iter().skip(5).collect::<Vec<Vec<Instruction>>>();
+    let digits = FirstFive::new();
+    for (digit, z) in digits {
+        if let Some(other_digit) = calculate_batch(&batches, z, vec![]) {
+            return into_number(digit, other_digit)
+        }
+    }
+    unreachable!()
+}
+
+fn calculate_batch(batches: &[Vec<Instruction>], z: isize, others: Vec<isize>) -> Option<Vec<isize>> {
     if batches.len() == 0 {
         println!("z: {}", z);
         println!("Digits: {:?}", others);
-        return true;
+        return Some(others);
     }
     for w in 1..10 {
         let mut new_others = others.clone();
         new_others.push(w);
         let (n, m) = get_variables(&batches[0]);
         if let Some(z) = try_digit(z, n, m, w) {
-            if calculate_batch(&batches[1..], z, new_others.clone()) {
-                return true;
+            if let Some(digits) = calculate_batch(&batches[1..], z, new_others.clone()) {
+                return Some(digits);
             }
         }
     }
 
-    false
+    None
+}
+
+fn into_number(lhs: usize, rhs: Vec<isize>) -> usize {
+    let mut serial_n = 0;
+    for n in rhs {
+        serial_n += n as usize;
+        serial_n *= 10;
+    }
+    lhs * 10_usize.pow(9) + serial_n
 }
 
 fn parse_to_batches() -> Vec<Vec<Instruction>> {
@@ -68,6 +87,28 @@ impl FirstFive {
     fn new() -> Self {
         Self { n: Numbers::new() }
     }
+
+    fn calculate_z(n: [u8; 5]) -> isize {
+        26_isize.pow(4) * n[0] as isize + 
+        26_isize.pow(3) * n[1] as isize + 
+        26_isize.pow(2) * n[2] as isize +
+        26 * n[3] as isize +
+        n[4] as isize +
+        2373828
+    }
+
+    fn verifiy_z(n: [u8;5], z: isize) -> Option<(usize, isize)> {
+        let mod_z = z % 26;
+        if mod_z <= 10 && mod_z >= 2 {
+            let digit = n[0] as usize * 10000 + 
+                        n[1] as usize * 1000 + 
+                        n[2] as usize * 100 + 
+                        n[3] as usize * 10 + 
+                        n[4] as usize;
+            return Some((digit, z));
+        }
+        None
+    }
 }
 
 impl Iterator for FirstFive {
@@ -76,19 +117,20 @@ impl Iterator for FirstFive {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let n = self.n.next()?;
-            let z = 26_isize.pow(4) * n[0] as isize + 
-                    26_isize.pow(3) * n[1] as isize + 
-                    26_isize.pow(2) * n[2] as isize +
-                    26 * n[3] as isize +
-                    n[4] as isize +
-                    2373828;
-            let mod_z = z % 26;
-            if mod_z <= 10 && mod_z >= 2 {
-                let digit = n[0] as usize * 10000 + 
-                            n[1] as usize * 1000 + 
-                            n[2] as usize * 100 + 
-                            n[3] as usize * 10 + 
-                            n[4] as usize;
+            let z = FirstFive::calculate_z(n);
+            if let Some((digit, z)) = FirstFive::verifiy_z(n, z) {
+                break Some((digit, z));
+            }
+        }
+    }
+}
+
+impl DoubleEndedIterator for FirstFive {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        loop {
+            let n = self.n.next_back()?;
+            let z = FirstFive::calculate_z(n);
+            if let Some((digit, z)) = FirstFive::verifiy_z(n, z) {
                 break Some((digit, z));
             }
         }
@@ -96,12 +138,16 @@ impl Iterator for FirstFive {
 }
 
 struct Numbers {
-    n: [u8; 5]
+    front: [u8; 5],
+    back: [u8; 5],
 }
 
 impl Numbers {
     fn new() -> Self {
-        Self {n: [8, 0, 0, 0, 0]}
+        Self { 
+            front: [0, 0, 0, 0, 0],  
+            back: [10, 10, 10, 10, 10], 
+        }
     }
 }
 
@@ -109,16 +155,41 @@ impl Iterator for Numbers {
     type Item = [u8; 5];
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.n == [9, 9, 9, 9, 9] {
+        if self.front == [9, 9, 9, 9, 9] || self.front == self.back {
             None
         } else {
             for i in (0..5).rev() {
-                self.n[i] = (self.n[i]) % 9 + 1;
-                if self.n[i] != 1 {
+                self.front[i] = (self.front[i]) % 9 + 1;
+                if self.front[i] != 1 {
                     break;
                 }
             }
-            Some(self.n)
+            if self.front == self.back {
+                None
+            } else {
+                Some(self.front)
+            }
+        }
+    }
+}
+
+impl DoubleEndedIterator for Numbers {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.back == [1, 1, 1, 1, 1] || self.front == self.back {
+            None
+        } else {
+            for i in (0..5).rev() {
+                self.back[i] = (self.back[i] + 16) % 9 + 1;
+                if self.back[i] != 9 {
+                    break;
+                }
+            }
+
+            if self.front == self.back {
+                None
+            } else {
+                Some(self.back)
+            }
         }
     }
 }
@@ -148,8 +219,13 @@ fn parse() -> Vec<Instruction> {
 
 #[test]
 fn test_number_iter() {
-    let nums = Numbers::new();
-    for n in nums {
-        println!("{:?}", n);
+    let mut nums = Numbers::new();
+    while let Some(front) = nums.next() {
+        println!("Front: {:?}", front);
+
+        match nums.next_back() {
+            Some(back) => println!("Back: {:?}", back),
+            None => break,
+        }
     }
 }
