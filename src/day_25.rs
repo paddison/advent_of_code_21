@@ -67,18 +67,24 @@ impl Grid {
         (index / self.dim.0, index % self.dim.0)
     }
 
-    fn can_move(&self, row: usize, col: usize, cuc: Cucumber) -> bool {
+    fn calculate_neighbour_position(&self, row: usize, col: usize, cuc: Cucumber) -> (usize, usize) {
         match cuc {
-            Cucumber::East => self.get(row, (col + 1) % self.dim.0).is_none(),
-            Cucumber::South => self.get((row + 1) % self.dim.1, col).is_none()
+            Cucumber::East => (row, (col + 1) % self.dim.0),
+            Cucumber::South => ((row + 1) % self.dim.1, col)
         }
     }
 
-    fn move_east(&mut self, row: usize, col: usize) {
-
+    fn try_move_cucumber(&mut self, row: usize, col: usize, cuc: Cucumber) {
+        let (new_row, new_col) = self.calculate_neighbour_position(row, col, cuc);
+        if self.get(new_row, new_col).is_none() {
+            let i = self.calculate_index(row, col);
+            let j = self.calculate_index(new_row, new_col);
+            self[i] = None;
+            self[j] = Some(cuc);
+        }
     }
 
-    fn move_sout(&mut self) {
+    fn move_south(&mut self) {
 
     }
 
@@ -90,13 +96,7 @@ impl Grid {
             let (row, col) = self.calculate_pos(i);
             // refactor moving into methods
             match cuc {
-                Some(Cucumber::East) => {
-                    if self.can_move(row, col, Cucumber::East) {
-                        let j = self.calculate_index(row, (col + 1) % self.dim.0);
-                        east_grid[i] = None;
-                        east_grid[j] = Some(Cucumber::East);
-                    }
-                },
+                Some(Cucumber::East) => east_grid.try_move_cucumber(row, col, Cucumber::East),
                 Some(Cucumber::South) => south_facing.push((row, col)),
                 None => (),
             }
@@ -105,12 +105,7 @@ impl Grid {
         // move south
         let mut south_grid = east_grid.clone();
         for (row, col) in south_facing {
-            let i = east_grid.calculate_index(row, col);
-            if east_grid.can_move(row, col, Cucumber::South) {
-                let j = east_grid.calculate_index((row + 1) % self.dim.1, col);
-                south_grid[i] = None;
-                south_grid[j] = Some(Cucumber::South);
-            }
+            south_grid.try_move_cucumber(row, col, Cucumber::East)
         }
         if self.grid == south_grid.grid {
             self.grid = south_grid.grid;
@@ -144,32 +139,9 @@ fn parse(input: &str) -> Grid {
 }
 
 #[test]
-fn test_grid_display() {
-    let mut g = parse(include_str!("../data/day_25_test_sm.txt"));
-    println!("{}\n", g);
-    g.do_move();
-    println!("{}\n", g);
-    g.do_move();
-    println!("{}\n", g);
-    g.do_move();
-    println!("{}\n", g);
-    g.do_move();
-    println!("{}\n", g);
-}
-
-#[test]
 fn test_stop() {
     let mut steps = 0;
     let mut g = parse(include_str!("../data/day_25_test.txt"));
-    // println!("{}\n", g);
-    // g.do_move();
-    // println!("{}\n", g);
-    // g.do_move();
-    // println!("{}\n", g);
-    // g.do_move();
-    // println!("{}\n", g);
-    // g.do_move();
-    // println!("{}\n", g);
     while g.do_move() {
         steps += 1;
         if steps % 10 == 0 {
