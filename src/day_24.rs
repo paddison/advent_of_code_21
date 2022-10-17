@@ -24,8 +24,8 @@ pub fn get_solution_2() -> usize {
 
 fn calculate_batch(batches: &[Vec<Instruction>], z: isize, others: Vec<isize>) -> Option<Vec<isize>> {
     if batches.len() == 0 {
-        println!("z: {}", z);
-        println!("Digits: {:?}", others);
+        // println!("z: {}", z);
+        // println!("Digits: {:?}", others);
         return Some(others);
     }
     for w in 1..10 {
@@ -145,7 +145,7 @@ struct Numbers {
 impl Numbers {
     fn new() -> Self {
         Self { 
-            front: [0, 0, 0, 0, 0],  
+            front: [8, 0, 0, 0, 0],  
             back: [10, 10, 10, 10, 10], 
         }
     }

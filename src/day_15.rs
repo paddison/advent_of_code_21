@@ -1,308 +1,208 @@
-// create a search frontier. A node is a touple of x and y coordinates, which represent index of map
-// a path contains visited nodes and neighbors, that have not been visited
-// for each new node, create visited path
-// path should store its current value
-// A* algorithm for traversal
-// store paths in array, if a path has no more neighbors remove it from path array
+use std::{ops::Deref, collections::{HashMap, BinaryHeap}};
 
-use crate::parse_lines;
-
-const SCALE_FACTOR: usize = 5;
-
-type Node = (u32, (usize, usize));
-
-pub fn get_solution_1(is_test: bool) -> u32 {
-    let file_name = match is_test {
-        true => "data/day_15_test.txt",
-        false => "data/day_15.txt",
-    };
-    let map: CaveMap = parse_lines(file_name).into();
-    let mut path_frontier = CavePathFrontier::new(map);
-
-    let result = loop {
-        if let Some(path) = path_frontier.advance() {
-            break path;
-        }
-    };
-
-    result.cost
+pub fn get_solution_1() -> usize {
+    let mut c = parse(include_str!("../data/day_15.txt"));
+    c.find_cheapest_path()
 }
 
-pub fn get_solution_2(is_test: bool) -> u32 {
-    let file_name = match is_test {
-        true => "data/day_15_test.txt",
-        false => "data/day_15.txt",
-    };
-    let map: CaveMap = parse_lines(file_name).into();
-    let map = map.enlarge_map(SCALE_FACTOR);
-    let mut path_frontier = CavePathFrontier::new(map);
-
-    let result = loop {
-        if let Some(path) = path_frontier.advance() {
-            break path;
-        }
-    };
-
-    result.cost
+pub fn get_solution_2() -> usize {
+    let c = parse(include_str!("../data/day_15.txt"));
+    let mut larger = enlarge_cave(c, 5);
+    larger.find_cheapest_path()
 }
 
-
-#[derive(PartialEq, Eq)]
-struct CaveMap {
-    vals: Vec<Option<u32>>,
-    dim: (usize, usize),
+fn parse(input: &str) -> Cave {
+    let cols = input.find('\n').unwrap();
+    let vals = input
+                .split('\n')
+                .flat_map(|l| l.chars())
+                .map(|c| c.to_digit(10).unwrap() as usize)
+                .collect::<Vec<usize>>();
+    
+    let rows = vals.len() / cols;
+    Cave { vals, dim: (rows, cols), visited: HashMap::new() }
 }
 
-impl CaveMap {
+struct Cave {
+    vals: Vec<usize>,
+    dim: (usize, usize), // row, col
+    visited: HashMap<(usize, usize), usize>
+}
 
-    fn get(&self, (x, y): (usize, usize)) -> Option<&u32> {
-        
-        if let Some(Some(val)) = self.vals.get(x * self.dim.0 + y) {
-            Some(val)
-        } else {
-            None
+impl Deref for Cave {
+    type Target = Vec<usize>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.vals
+    }
+}
+
+impl Cave {
+    fn get(&self, row: usize, col: usize) -> Option<usize> {
+        if row >= self.dim.0 || col >= self.dim.1 {
+            return None;
+        } 
+        let index = self.dim.1 * row + col;
+        self.vals.get(index).cloned()     
+    }
+
+    fn get_neighbours(&self, n: &Node) -> Vec<Node> {
+        let mut neighbours = Vec::new();
+        let (row, col) = n.pos;
+        // right
+        if let Some(val) = self.get(row, col + 1) {
+            neighbours.push(Node::new(val, (row, col + 1), n.cost + n.val, self.distance(row, col + 1)));
         }
-    }
-
-    fn _get_mut(&mut self, (x, y): (usize, usize)) -> Option<&mut u32> {
-        if let Some(Some(val)) =  self.vals.get_mut(x * self.dim.0 + y) {
-            Some(val)
-        } else {
-            None
+        //down
+        if let Some(val) = self.get(row + 1, col) {
+            neighbours.push(Node::new(val, (row + 1, col), n.cost + n.val, self.distance(row + 1, col)));
         }
+        // left
+        if col > 0 {
+            if let Some(val) = self.get(row, col - 1) {
+                neighbours.push(Node::new(val, (row, col - 1), n.cost + n.val, self.distance(row, col - 1)));
+            }
+        }
+        // up
+        if row > 0 {
+            if let Some(val) = self.get(row - 1, col) {
+                neighbours.push(Node::new(val, (row - 1, col), n.cost + n.val, self.distance(row - 1, col)));
+            }
+        }
+
+        neighbours
     }
 
-    fn set_to_visited(&mut self, (x, y): (usize, usize)) {
-        self.vals[x * self.dim.0 + y] = None;
+    // calculate manhattan distance
+    fn distance(&self, row: usize, col: usize) -> usize {
+        row.abs_diff(self.dim.0) + col.abs_diff(self.dim.1)
     }
 
-    fn enlarge_map(&self, scale_factor: usize) -> Self {
-        // transfrom map.vals to normal numbers:
-        let base_block: Vec<u32> = self.vals.iter().map(|val| val.unwrap()).collect();
+    fn is_goal(&self, n: &Node) -> bool {
+        n.pos == (self.dim.0 - 1, self.dim.1 - 1)
+    }
 
-        let mut new_vals = vec![];
+    fn find_cheapest_path(&mut self) -> usize {
+        let initial = Node::new(0, (0, 0), 0, self.distance(0, 0));
+        let mut queue = BinaryHeap::new();
+        queue.push(initial);
 
-        for i in 0..scale_factor {
-            for y in 0..self.dim.1 {
-                for j in 0..scale_factor {
-                    for x in 0..self.dim.0 {
-                        let new_val = (base_block[y * self.dim.0 + x] + i as u32 + j as u32 - 1) % 9 + 1;
-                        new_vals.push(new_val);
+        while let Some(n) = queue.pop() {
+            for neighbour in self.get_neighbours(&n) {
+                if self.is_goal(&neighbour) {
+                    return neighbour.cost + neighbour.val
+                }
+                if let Some(cost) = self.visited.get_mut(&neighbour.pos) {
+                    if &neighbour.cost < cost {
+                        *cost = neighbour.cost;
+                        queue.push(neighbour)
                     }
+                } else {
+                    self.visited.insert(neighbour.pos, neighbour.cost);
+                    queue.push(neighbour)
                 }
             }
         }
 
-        let vals = new_vals.into_iter().map(Some).collect();
-
-        CaveMap { vals, dim: (self.dim.0 * SCALE_FACTOR, self.dim.1 * SCALE_FACTOR) }
+        unreachable!()
     }
 }
 
-impl From<Vec<String>> for CaveMap {
-    fn from(input: Vec<String>) -> Self {
-        let dim = (input[0].len(), input.len());
-        let mut vals = vec![];
-        for line in input {
-            for c in line.chars() {
-                vals.push(Some(c.to_digit(10).unwrap()));
-            }
-        }
-
-        CaveMap { vals, dim }
-    }
-}
-
-#[derive(PartialEq, Debug)]
-struct CavePath {
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Node {
+    val: usize, // value of node
     pos: (usize, usize),
-    cost: u32,
+    cost: usize, // cost of getting to node
+    dist: usize // manhattan distance to goal
 }
 
-impl CavePath {
-    fn copy_update(&self, n: Node) -> Self {
-        CavePath { pos: n.1, cost: n.0 + self.cost}
+impl Ord for Node {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.val + self.cost + self.dist).cmp(&(other.val + other.cost + other.dist)).reverse()
     }
 }
 
-struct CavePathFrontier {
-    paths: Vec<CavePath>,
-    map: CaveMap,
-    exit: (usize, usize)
+impl PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        (self.val + self.cost + self.dist)
+            .partial_cmp(&(other.val + other.cost + other.dist))
+            .and_then(|ord| Some(ord.reverse()))
+    }
 }
 
-impl CavePathFrontier {
-    fn new(map: CaveMap) -> Self{
-        let exit = (map.dim.0 - 1, map.dim.1 - 1);
-        let paths = vec![CavePath { pos: (0, 0), cost: 0 }];
-        CavePathFrontier { paths, map, exit }
+impl Node {
+    fn new(val: usize, pos: (usize, usize), cost: usize, dist: usize) -> Self {
+        Node { val, pos, cost, dist }
     }
+}
 
-    fn is_complete(&self, path: &CavePath) -> bool {
-        self.exit == path.pos
-    }
+#[test]
+fn test_parse() {
+    let c = parse(include_str!("../data/day_15_test.txt"));
+    assert_eq!(c.dim.0, 10);
+    assert_eq!(c.dim.1, 10);
+    assert_eq!(c.vals.len(), 100);
+}
 
-    fn get_neighbors(&self, path: &CavePath) -> Vec<Node> {
-        let mut neighbors = vec![];
-        let pos = path.pos;
+#[test]
+fn test_get() {
+    let c = parse(include_str!("../data/day_15_test.txt"));
+    let v99 = c.get(9, 9);
+    assert_eq!(Some(1), v99);
+    let v_010 = c.get(0, 10);
+    assert_eq!(None, v_010);
+}
 
-        // calculate new positions
-        if pos.1 > 0 {
-            let upper = (pos.0, pos.1 - 1); // overflow gets checked via get function
-            if let Some(val) = self.map.get(upper) { neighbors.push((*val, upper)) };
-        }
-        
-        if pos.0 > 0 {
-            let left = (pos.0 - 1 , pos.1);
-            if let Some(val) = self.map.get(left) { neighbors.push((*val, left)) };
-        }
+#[test]
+fn with_test_data() {
+    let mut c = parse(include_str!("../data/day_15_test.txt"));
 
-        let right = (pos.0 + 1, pos.1);
-        if let Some(val) = self.map.get(right) { neighbors.push((*val, right)) };
-        
-        let lower = (pos.0, pos.1 + 1);
-        if let Some(val) = self.map.get(lower) { neighbors.push((*val, lower)) };
+    let result = c.find_cheapest_path();
+    assert_eq!(result, 40);
+}
 
-        neighbors
-    }
+#[test]
+fn test_ord_node() {
+    use std::cmp::Ordering;
+    let c = parse(include_str!("../data/day_15_test.txt"));
 
-    fn heuristic(&self, path: &CavePath) -> f64 {
-        let a = path.pos.0 as f64;
-        let b = path.pos.1 as f64;
-        let dist = f64::sqrt(a * a + b * b);
+    let expensive = Node::new(3, (1, 1), 1, c.distance(1, 1));
+    let cheap = Node::new(2, (2, 0), 1, c.distance(2, 0));
 
-        path.cost as f64 + dist
+    assert_eq!(cheap.cmp(&expensive), Ordering::Greater);
+    assert_eq!(expensive.cmp(&cheap), Ordering::Less);
 
-    }
+    let mut heap = BinaryHeap::new();
+    heap.push(expensive);
+    heap.push(cheap);
+    assert_eq!(heap.pop(), Some(cheap));
 
-    fn advance(&mut self) -> Option<CavePath> {
+    let mut heap = BinaryHeap::new();
+    heap.push(cheap);
+    heap.push(expensive);
+    assert_eq!(heap.pop(), Some(cheap));
+}
 
-        let mut candidates = vec![];
 
-        for path in &self.paths {
-            let mut neighbors: Vec<CavePath> = vec![];
-            
-            for neighbor in self.get_neighbors(path) {
-                neighbors.push(path.copy_update(neighbor));
+fn enlarge_cave(c: Cave, scale_factor: usize) -> Cave {
+    // transfrom map.vals to normal numbers:
+    let base_block: Vec<usize> = c.vals.iter().map(|val| *val).collect();
+
+    let mut new_vals = vec![];
+
+    for i in 0..scale_factor {
+        for y in 0..c.dim.1 {
+            for j in 0..scale_factor {
+                for x in 0..c.dim.0 {
+                    let new_val = (base_block[y * c.dim.0 + x] + i as usize + j as usize - 1) % 9 + 1;
+                    new_vals.push(new_val);
+                }
             }
-
-            let cmp_heuristic = |lhs: &CavePath, rhs: &CavePath| self.heuristic(lhs).total_cmp(&self.heuristic(rhs));
-            // determine cheapest neighbor
-            if let Some(min) = neighbors
-                                .into_iter()
-                                .min_by(cmp_heuristic) {
-                candidates.push(min);
-            };
         }
-
-        // determine cheapest path
-        let min = candidates.into_iter().min_by(|lhs, rhs| lhs.cost.cmp(&rhs.cost)).unwrap();
-        if self.is_complete(&min) {
-            Some(min)
-        } else {
-            self.map.set_to_visited(min.pos);
-            self.paths.push(min);
-            None
-        }
-    } 
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{day_15::{CaveMap, CavePath}, parse_lines};
-
-    use super::{CavePathFrontier, SCALE_FACTOR};
-
-    fn create_test_data() -> Vec<String> {
-        vec!["12345".to_string(), "54321".to_string(), "31245".to_string()]
     }
 
-    fn create_mini_test_data() -> CaveMap {
-        vec!["12".to_string(), "34".to_string()].into()
-    }
+    // let vals = new_vals.into_iter().map(Some).collect();
 
-    fn create_online_test_data() -> CaveMap {
-        parse_lines("data/day_15_test.txt").into()
-    }
-
-    #[test]
-    fn test_create_map() {
-        let map: CaveMap = create_test_data().into();
-        let expected_vals: Vec<Option<u32>> = vec![
-            1, 2, 3, 4, 5, 
-            5, 4, 3, 2, 1, 
-            3, 1, 2, 4, 5].into_iter().map(|x| Some(x)).collect();
-        
-        assert_eq!(map.dim, (5, 3));
-        assert_eq!(map.vals, expected_vals);
-    }
-
-    #[test]
-    fn test_frontier_new() {
-        let map: CaveMap = create_test_data().into();
-        let frontier = CavePathFrontier::new(map);
-
-        assert_eq!(frontier.paths[0], CavePath { cost: 0, pos: (0, 0) });
-        assert_eq!(frontier.exit, (4, 2));
-    }
-
-    #[test]
-    fn test_frontier_advance() {
-        let mut frontier = CavePathFrontier::new(create_online_test_data());
-        let result = frontier.advance();
-        assert!(result.is_none());
-        // should go left first
-        assert!(frontier.map.get((1, 0)).is_none());
-
-        let result = frontier.advance();
-        assert!(result.is_none());
-        // should go left first
-        assert!(frontier.map.get((0, 1)).is_none());
-    }
-
-    #[test]
-    fn test_frontier_advance_result() {
-        let mut frontier = CavePathFrontier::new(create_online_test_data());
-        
-        let result = loop {
-            if let Some(path) = frontier.advance() {
-                break path;
-            }
-        };
-    
-        assert_eq!(result.cost, 40);
-    }
-
-    #[test]
-    fn test_enlarge_map() {
-
-        let map = create_mini_test_data();
-        let actual = map.enlarge_map(3);
-        let expected: Vec<Option<u32>> = vec![
-            1, 2, 2, 3, 3, 4, 
-            3, 4, 4, 5, 5, 6, 
-            2, 3, 3, 4, 4, 5, 
-            4, 5, 5, 6, 6, 7, 
-            3, 4, 4, 5, 5, 6, 
-            5, 6, 6, 7, 7, 8].into_iter().map(|x| Some(x)).collect();
-
-        assert_eq!(actual.vals, expected);
-    }
-
-    #[test]
-    fn test_enlarge_map_result() {
-        let map = create_online_test_data();
-        let large_map = map.enlarge_map(SCALE_FACTOR);
-
-        let mut frontier = CavePathFrontier::new(large_map);
-
-        let result = loop {
-            if let Some(path) = frontier.advance() {
-                break path;
-            }
-        };
-    
-        assert_eq!(result.cost, 315);
-    }
+    Cave { vals: new_vals, dim: (c.dim.0 * scale_factor, c.dim.1 * scale_factor), visited: HashMap::new() }
 }
 

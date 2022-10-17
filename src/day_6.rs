@@ -42,10 +42,19 @@ fn count_fish(spawn_map: HashMap<u8, u128>) -> u128 {
     sum
 }
 
-pub fn solve_6_1(file_name: &str, days: u32) -> u128 {
-    let fish = split_commas(file_name);
+pub fn get_solution_1() -> u128 {
+    let fish = split_commas("data/day_6.txt");
     let mut spawn_map = create_spawn_map(fish);
-    for _ in 0..days {
+    for _ in 0..80 {
+        update_spawn_map(&mut spawn_map)
+    }
+    count_fish(spawn_map)
+}
+
+pub fn get_solution_2() -> u128 {
+    let fish = split_commas("data/day_6.txt");
+    let mut spawn_map = create_spawn_map(fish);
+    for _ in 0..256 {
         update_spawn_map(&mut spawn_map)
     }
     count_fish(spawn_map)

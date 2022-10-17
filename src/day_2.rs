@@ -38,12 +38,12 @@ fn calculate_position_with_aim(input: Vec<String>) -> u32 {
     horizontal * depth
 }
 
-pub fn solve_day_2_1(file_name: &str) -> u32 {
-    let input = parse_lines(file_name);
+pub fn get_solution_1() -> u32 {
+    let input = parse_lines("data/day_2.txt");
     calculate_position(input)
 }
 
-pub fn solve_day_2_2(file_name: &str) -> u32 {
-    let input = parse_lines(file_name);
+pub fn get_solution_2() -> u32 {
+    let input = parse_lines("data/day_2.txt");
     calculate_position_with_aim(input)
 }

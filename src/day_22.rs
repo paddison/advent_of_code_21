@@ -23,7 +23,7 @@ pub fn get_solution_1() -> isize {
     for (turns_on, cuboid) in get_input().into_iter().take(20) {
     grid = parse_instruction(turns_on, cuboid, grid);
     }
-    println!("Total of {} cuboids.", grid.len());
+    // println!("Total of {} cuboids.", grid.len());
     grid.iter().fold(0, |acc, cub| acc + cub.count_cubes())
 }
 
@@ -32,7 +32,7 @@ pub fn get_solution_2() -> isize {
     for (turns_on, cuboid) in get_input() {
     grid = parse_instruction(turns_on, cuboid, grid);
     }
-    println!("Total of {} cuboids.", grid.len());
+    // println!("Total of {} cuboids.", grid.len());
     grid.iter().fold(0, |acc, cub| acc + cub.count_cubes())
 }
 

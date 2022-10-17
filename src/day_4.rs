@@ -120,14 +120,14 @@ fn _print_board(board: &Vec<BoardMap>) {
 }
 
 
-pub fn solve_4_1(file_name: &str) -> i32 {
-    let input = parse_lines(file_name);
+pub fn get_solution_1() -> i32 {
+    let input = parse_lines("data/day_4.txt");
     let (numbers,  mut boards) = parse_board(input);
     determine_winner(&numbers, &mut boards)
 }
 
-pub fn solve_4_2(file_name: &str) -> i32 {
-    let input = parse_lines(file_name);
+pub fn get_solution_2() -> i32 {
+    let input = parse_lines("data/day_4.txt");
     let (numbers,  boards) = parse_board(input);
     determine_last_winner(numbers, boards)
 }

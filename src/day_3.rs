@@ -17,8 +17,8 @@ fn binary_diagnostic(input: Vec<String>) -> u32 {
     result * (!result & (2_u32.pow(line_length as u32) - 1)) 
 }
 
-pub fn solve_3_1(file_name: &str) -> u32 {
-    let input = parse_lines(file_name);
+pub fn get_solution_1() -> u32 {
+    let input = parse_lines("data/day_3.txt");
     binary_diagnostic(input)
 }
 
@@ -61,8 +61,8 @@ fn most_common_bit(index: usize, input: &Vec<String>) -> i32 {
     }
 }
 
-pub fn solve_3_2(file_name: &str) -> u32 {
-    let input = parse_lines(file_name);
+pub fn get_solution_2() -> u32 {
+    let input = parse_lines("data/day_3.txt");
     let oxygen_rating = determine_oxygen_rating(&input);
     let o2_rating = determine_o2_rating(&input);
     oxygen_rating * o2_rating

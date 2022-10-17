@@ -163,8 +163,8 @@ fn create_map(lines: Vec<Line>) -> HashMap<(u32, u32), u32> {
     map
 }
 
-pub fn solve_5_1(file_name: &str) -> u32 {
-    let raw_lines = parse_lines(file_name);
+pub fn get_solution_1() -> u32 {
+    let raw_lines = parse_lines("data/day_5.txt");
     let lines: Vec<Line> = raw_lines.into_iter()
         .map(
             Line::from)
@@ -179,8 +179,8 @@ pub fn solve_5_1(file_name: &str) -> u32 {
     count
 }
 
-pub fn solve_5_2(file_name: &str) -> u32 {
-    let raw_lines = parse_lines(file_name);
+pub fn get_solution_2() -> u32 {
+    let raw_lines = parse_lines("data/day_5.txt");
     let lines: Vec<Line> = raw_lines.into_iter()
         .map(Line::from)
         .collect();

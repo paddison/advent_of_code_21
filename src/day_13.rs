@@ -16,7 +16,7 @@ pub fn get_solution_1() -> usize{
     sum
 }
 
-pub fn get_solution_2() -> usize{
+pub fn get_solution_2() -> usize {
     let lines = parse_lines("data/day_13.txt");
     let (points, folds) = prepare_input(lines);
     let p = Paper::new(points, folds);
@@ -24,7 +24,7 @@ pub fn get_solution_2() -> usize{
     for points in p.into_iter() {
         final_pattern = points;
     }
-    print_pattern(final_pattern);
+    // print_pattern(final_pattern);
     0
 }
 

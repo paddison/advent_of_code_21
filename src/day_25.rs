@@ -74,9 +74,9 @@ impl Grid {
         }
     }
 
-    fn try_move_cucumber(&mut self, row: usize, col: usize, cuc: Cucumber) {
+    fn try_move_cucumber(&mut self, row: usize, col: usize, cuc: Cucumber, old_grid: &Grid) {
         let (new_row, new_col) = self.calculate_neighbour_position(row, col, cuc);
-        if self.get(new_row, new_col).is_none() {
+        if old_grid.get(new_row, new_col).is_none() {
             let i = self.calculate_index(row, col);
             let j = self.calculate_index(new_row, new_col);
             self[i] = None;
@@ -90,9 +90,8 @@ impl Grid {
         let mut south_facing = Vec::new();
         for (i, cuc) in self.grid.iter().enumerate() {
             let (row, col) = self.calculate_pos(i);
-            // refactor moving into methods
             match cuc {
-                Some(Cucumber::East) => east_grid.try_move_cucumber(row, col, Cucumber::East),
+                Some(Cucumber::East) => east_grid.try_move_cucumber(row, col, Cucumber::East, self),
                 Some(Cucumber::South) => south_facing.push((row, col)),
                 None => (),
             }
@@ -101,10 +100,9 @@ impl Grid {
         // move south
         let mut south_grid = east_grid.clone();
         for (row, col) in south_facing {
-            south_grid.try_move_cucumber(row, col, Cucumber::South)
+            south_grid.try_move_cucumber(row, col, Cucumber::South, &east_grid)
         }
         if self.grid == south_grid.grid {
-            self.grid = south_grid.grid;
             false
         } else {
             self.grid = south_grid.grid;
@@ -138,6 +136,15 @@ fn parse(input: &str) -> Grid {
 fn test_stop() {
     let mut steps = 0;
     let mut g = parse(include_str!("../data/day_25_test.txt"));
+    // println!("{}\n", g);
+    // g.do_move();
+    // println!("{}\n", g);
+    // g.do_move();
+    // println!("{}\n", g);
+    // g.do_move();
+    // println!("{}\n", g);
+    // g.do_move();
+    // println!("{}\n", g);
     while g.do_move() {
         steps += 1;
         if steps % 10 == 0 {
