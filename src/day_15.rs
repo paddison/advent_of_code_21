@@ -101,6 +101,8 @@ impl Cave {
                     self.visited.insert(neighbour.pos, neighbour.cost);
                     queue.push(neighbour)
                 }
+                // queue.push(neighbour)
+
             }
         }
 

@@ -20,15 +20,15 @@ pub fn get_solution_2() -> usize {
     let lines = parse_lines("data/day_13.txt");
     let (points, folds) = prepare_input(lines);
     let p = Paper::new(points, folds);
-    let mut final_pattern = vec![];
+    let mut _final_pattern = vec![];
     for points in p.into_iter() {
-        final_pattern = points;
+        _final_pattern = points;
     }
     // print_pattern(final_pattern);
     0
 }
 
-fn print_pattern(pattern: Vec<Vec<bool>>) {
+fn _print_pattern(pattern: Vec<Vec<bool>>) {
     let mut s = String::new();
     for line in pattern {
         for point in line {

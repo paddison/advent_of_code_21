@@ -16,7 +16,7 @@ pub fn get_solution_1(is_test: bool) -> u128 {
     let mut poly = lines[0].to_string();
     let map = get_poly_map(&lines[2..]);
 
-    for i in 0..10 {
+    for _ in 0..10 {
         // println!("Step: {i}");
         poly = grow(&map, poly);
     }
